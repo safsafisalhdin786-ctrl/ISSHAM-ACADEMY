@@ -7,79 +7,115 @@
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 15px; margin: 0; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #1e3a8a; }
-        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .logo { display: block; margin: 0 auto 15px; max-width: 140px; border-radius: 8px; }
+        h2 { text-align: center; color: #1e3a8a; margin-bottom: 20px; }
+        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
         input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
         button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background: #1d4ed8; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; overflow-x: auto; display: block; }
+        .table-wrapper { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; white-space: nowrap; }
         th { background: #1e3a8a; color: white; }
+        .delete-btn { background: #dc2626; padding: 5px 10px; border-radius: 4px; color: white; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
+        <img src="8d7e42f8-1ba0-42d3-8838-01042980c3db.jpeg" alt="شعار أكاديمية إسهام" class="logo" onerror="this.style.display='none'">
         <h2>أكاديمية إسهام - تسجيل ومتابعة التلاميذ</h2>
         <form id="studentForm">
             <div class="form-group">
                 <input type="text" id="name" placeholder="اسم التلميذ" required>
                 <input type="tel" id="parentPhone" placeholder="رقم هاتف الأب" required>
-                <input type="number" id="grade" placeholder="التنقيط / النقطة" min="0" max="20" step="0.5">
-                <input type="text" id="participation" placeholder="المشاركة (ممتاز، متوسط...)">
+                <input type="number" id="grade" placeholder="التنقيط /20" min="0" max="20" step="0.5">
+                <input type="text" id="participation" placeholder="المشاركة">
                 <input type="number" id="fee" placeholder="المبلغ الشهري (DH)" required>
                 <select id="month">
+                    <option value="شتمبر">شتمبر</option>
+                    <option value="أكتوبر">أكتوبر</option>
+                    <option value="نونبر">نونبر</option>
+                    <option value="دجنبر">دجنبر</option>
                     <option value="يناير">يناير</option>
                     <option value="فبراير">فبراير</option>
                     <option value="مارس">مارس</option>
                     <option value="أبريل">أبريل</option>
                     <option value="ماي">ماي</option>
                     <option value="يونيو">يونيو</option>
-                    <option value="غشت">غشت</option>
-                    <option value="شتمبر">شتمبر</option>
-                    <option value="أكتوبر">أكتوبر</option>
-                    <option value="نونبر">نونبر</option>
-                    <option value="دجنبر">دجنبر</option>
                 </select>
                 <input type="number" id="absence" placeholder="عدد أيام الغياب" min="0" value="0">
             </div>
             <button type="submit">إضافة التلميذ</button>
         </form>
 
-        <table id="studentTable">
-            <thead>
-                <tr>
-                    <th>اسم التلميذ</th>
-                    <th>هاتف الأب</th>
-                    <th>التنقيط</th>
-                    <th>المشاركة</th>
-                    <th>المبلغ</th>
-                    <th>الشهر</th>
-                    <th>الغياب</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-wrapper">
+            <table id="studentTable">
+                <thead>
+                    <tr>
+                        <th>اسم التلميذ</th>
+                        <th>هاتف الأب</th>
+                        <th>التنقيط</th>
+                        <th>المشاركة</th>
+                        <th>المبلغ</th>
+                        <th>الشهر</th>
+                        <th>الغياب</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         const form = document.getElementById('studentForm');
         const tableBody = document.querySelector('#studentTable tbody');
 
+        let students = JSON.parse(localStorage.getItem('issham_students')) || [];
+
+        function renderStudents() {
+            tableBody.innerHTML = '';
+            students.forEach((s, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${s.name}</td>
+                    <td>${s.phone}</td>
+                    <td>${s.grade} / 20</td>
+                    <td>${s.participation}</td>
+                    <td>${s.fee} DH</td>
+                    <td>${s.month}</td>
+                    <td>${s.absence} أيام</td>
+                    <td><button class="delete-btn" onclick="deleteStudent(${index})">حذف</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${document.getElementById('name').value}</td>
-                <td>${document.getElementById('parentPhone').value}</td>
-                <td>${document.getElementById('grade').value} / 20</td>
-                <td>${document.getElementById('participation').value}</td>
-                <td>${document.getElementById('fee').value} DH</td>
-                <td>${document.getElementById('month').value}</td>
-                <td>${document.getElementById('absence').value} أيام</td>
-            `;
-            tableBody.appendChild(row);
+            const newStudent = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('parentPhone').value,
+                grade: document.getElementById('grade').value || '0',
+                participation: document.getElementById('participation').value || '-',
+                fee: document.getElementById('fee').value,
+                month: document.getElementById('month').value,
+                absence: document.getElementById('absence').value || '0'
+            };
+            students.push(newStudent);
+            localStorage.setItem('issham_students', JSON.stringify(students));
+            renderStudents();
             form.reset();
         });
+
+        function deleteStudent(index) {
+            students.splice(index, 1);
+            localStorage.setItem('issham_students', JSON.stringify(students));
+            renderStudents();
+        }
+
+        renderStudents();
     </script>
 </body>
 </html>
+
