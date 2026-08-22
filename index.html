@@ -1,477 +1,96 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة إدارة أكاديمية إسهام الشاملة</title>
-    <style>
-        :root {
-            --primary-color: #1e3a8a;
-            --secondary-color: #2563eb;
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text-color: #1e293b;
-            --border-color: #e2e8f0;
-            --success-color: #16a34a;
-            --danger-color: #dc2626;
-            --warning-color: #d97706;
-        }
+<!-- استدعاء المكتبات الضرورية (Firebase + Excel + PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.autotable.min.js"></script>
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; min-height: 100vh; }
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        header { background: var(--primary-color); color: white; padding: 15px 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        header img { max-width: 110px; height: auto; margin-bottom: 8px; border-radius: 6px; }
-        header h1 { font-size: 1.4rem; margin-bottom: 5px; }
+  const firebaseConfig = {
+    apiKey: "AIzaSyDP3-oVC5Q9mTG4Lj0Y10TXMQmf4BKXB18",
+    authDomain: "issham-acadmy.firebaseapp.com",
+    projectId: "issham-acadmy",
+    storageBucket: "issham-acadmy.firebasestorage.app",
+    messagingSenderId: "3012980900",
+    appId: "1:3012980900:web:95dd7347dade35626c3631",
+    measurementId: "G-9CFVEYM41T"
+  };
 
-        nav { background: #0f172a; display: flex; justify-content: center; overflow-x: auto; }
-        nav button { background: none; border: none; color: #94a3b8; padding: 12px 18px; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: 0.3s; white-space: nowrap; }
-        nav button.active, nav button:hover { color: white; border-bottom: 3px solid var(--secondary-color); background: rgba(255,255,255,0.05); }
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const studentsCol = collection(db, "students");
 
-        .container { max-width: 1100px; width: 95%; margin: 20px auto; flex: 1; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+  let localStudentsData = [];
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--card-bg); padding: 18px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .stat-card h3 { color: #64748b; font-size: 0.85rem; margin-bottom: 8px; }
-        .stat-card p { font-size: 1.6rem; font-weight: bold; color: var(--primary-color); }
+  // 1. التحديث التلقائي المباشر (كيبان عند كلشي فالحين)
+  onSnapshot(studentsCol, (snapshot) => {
+    localStudentsData = [];
+    snapshot.forEach(doc => {
+      localStudentsData.push({ id: doc.id, ...doc.data() });
+    });
+    renderStudentsTable(localStudentsData);
+  });
 
-        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .card h2 { color: var(--primary-color); font-size: 1.1rem; margin-bottom: 15px; border-bottom: 2px solid var(--bg-color); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-size: 0.8rem; font-weight: bold; color: #475569; }
-        input, select { padding: 9px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.88rem; outline: none; }
-        input:focus, select:focus { border-color: var(--secondary-color); }
-        
-        .btn { background: var(--secondary-color); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
-        .btn:hover { background: #1d4ed8; }
-        .btn-success { background: var(--success-color); }
-        .btn-success:hover { background: #15803d; }
-        .btn-danger { background: var(--danger-color); }
-        .btn-danger:hover { background: #b91c1c; }
-        .btn-wa { background: #25d366; color: white; }
-        .btn-wa:hover { background: #1da851; }
+  // 2. دالة إضافة تلميذ جديد لـ Firebase
+  window.addStudent = async function(event) {
+    event.preventDefault();
+    const name = document.getElementById("studentName").value;
+    const level = document.getElementById("studentLevel").value;
+    const group = document.getElementById("studentGroup").value;
+    const phone = document.getElementById("parentPhone").value;
+    const fee = document.getElementById("monthlyFee").value;
 
-        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .toolbar input { flex: 1; min-width: 200px; }
+    try {
+      await addDoc(studentsCol, {
+        name, level, group, phone, fee,
+        createdAt: new Date()
+      });
+      alert("تم تسجيل التلميذ بنجاح فـ قاعدة البيانات!");
+      document.getElementById("studentForm").reset();
+    } catch (e) {
+      alert("حدث خطأ أثناء الحفظ: " + e.message);
+    }
+  };
 
-        .table-responsive { overflow-x: auto; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-        th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
-        th { background: #f1f5f9; color: #334155; font-weight: bold; }
-        tr:hover { background: #f8fafc; }
+  // 3. دالة إرسال رسالة الواتساب وتنظيف الرقم تلقائياً
+  window.sendWhatsApp = function(phoneName, studentName) {
+    let cleanPhone = phoneName.replace(/\D/g, ''); 
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '212' + cleanPhone.slice(1);
+    }
+    const message = `السلام عليكم، بخصوص التلميذ(ة) ${studentName} فـ أكاديمية إسهام...`;
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
-        .badge { padding: 3px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
-        .badge-paid { background: #dcfce7; color: #166534; }
-        .badge-unpaid { background: #fee2e2; color: #991b1b; }
+  // 4. تصدير الجدول إلى Excel
+  window.exportToExcel = function() {
+    if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
+    const ws = XLSX.utils.json_to_sheet(localStudentsData.map(s => ({
+      "الاسم الكامل": s.name,
+      "المستوى الدراسي": s.level,
+      "المجموعة": s.group,
+      "هاتف ولي الأمر": s.phone,
+      "المبلغ الشهري": s.fee
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "التلاميذ");
+    XLSX.writeFile(wb, "لائحة_تلاميذ_أكاديمية_إسهام.xlsx");
+  };
 
-        @media print {
-            body * { visibility: hidden; }
-            #receiptModal, #receiptModal * { visibility: visible; }
-            #receiptModal { position: absolute; left: 0; top: 0; width: 100%; }
-            .no-print { display: none !important; }
-        }
-
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 450px; text-align: center; }
-        
-        footer { text-align: center; padding: 15px; font-size: 0.8rem; color: #64748b; margin-top: auto; border-top: 1px solid var(--border-color); }
-    </style>
-</head>
-<body>
-
-    <header class="no-print">
-        <img src="8d7e42f8-1ba0-42d3-8838-01042980c3db.jpeg" alt="شعار أكاديمية إسهام" onerror="this.style.display='none'">
-        <h1>أكاديمية إسهام - منصة الإدارة الشاملة</h1>
-    </header>
-
-    <nav class="no-print">
-        <button class="nav-btn active" onclick="switchTab('dashboard')">لوحة التحكم</button>
-        <button class="nav-btn" onclick="switchTab('students')">التلاميذ</button>
-        <button class="nav-btn" onclick="switchTab('attendance')">الحضور والغياب</button>
-        <button class="nav-btn" onclick="switchTab('payments')">الأداءات والوصلات</button>
-        <button class="nav-btn" onclick="switchTab('teachers')">الأساتذة</button>
-    </nav>
-
-    <div class="container no-print">
-
-        <!-- Tab 1: Dashboard -->
-        <div id="dashboard" class="tab-content active">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>إجمالي التلاميذ</h3>
-                    <p id="totalStudents">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>نسبة الحضور اليوم</h3>
-                    <p id="attendanceRate">0%</p>
-                </div>
-                <div class="stat-card">
-                    <h3>المخالصين هذا الشهر</h3>
-                    <p id="paidCount">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>المداخيل الشهرية المتوقعة</h3>
-                    <p id="totalRevenue">0 DH</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 2: Students -->
-        <div id="students" class="tab-content">
-            <div class="card">
-                <h2>إضافة تلميذ جديد</h2>
-                <form id="studentForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>الاسم الكامل</label>
-                            <input type="text" id="stName" required>
-                        </div>
-                        <div class="form-group">
-                            <label>المستوى الدراسي</label>
-                            <select id="stLevel">
-                                <option value="الابتدائي">الابتدائي</option>
-                                <option value="الإعدادي">الإعدادي</option>
-                                <option value="الثانوي">الثانوي</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>المجموعة / الفصل</label>
-                            <input type="text" id="stGroup" placeholder="مثال: مجموعة A" required>
-                        </div>
-                        <div class="form-group">
-                            <label>هاتف ولي الأمر</label>
-                            <input type="tel" id="stPhone" required>
-                        </div>
-                        <div class="form-group">
-                            <label>المبلغ الشهري (DH)</label>
-                            <input type="number" id="stFee" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-success" style="margin-top: 12px; width: 100%;">تسجيل التلميذ</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h2>
-                    لائحة التلاميذ
-                    <button class="btn" onclick="exportToCSV()">تصدير Excel 📥</button>
-                </h2>
-                <div class="toolbar">
-                    <input type="text" id="searchStudent" placeholder="بحث بالاسم أو المجموعة..." onkeyup="renderStudents()">
-                </div>
-                <div class="table-responsive">
-                    <table id="studentsTable">
-                        <thead>
-                            <tr>
-                                <th>الاسم الكامل</th>
-                                <th>المستوى</th>
-                                <th>المجموعة</th>
-                                <th>الهاتف</th>
-                                <th>المبلغ</th>
-                                <th>الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 3: Attendance -->
-        <div id="attendance" class="tab-content">
-            <div class="card">
-                <h2>تتبع الحضور والغياب اليومي</h2>
-                <div class="table-responsive">
-                    <table id="attendanceTable">
-                        <thead>
-                            <tr>
-                                <th>الاسم الكامل</th>
-                                <th>المجموعة</th>
-                                <th>حالة الحضور</th>
-                                <th>تسجيل</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 4: Payments -->
-        <div id="payments" class="tab-content">
-            <div class="card">
-                <h2>تتبع الواجبات الشهرية والوصلات</h2>
-                <div class="table-responsive">
-                    <table id="paymentsTable">
-                        <thead>
-                            <tr>
-                                <th>الاسم الكامل</th>
-                                <th>المبلغ</th>
-                                <th>حالة الأداء</th>
-                                <th>تذكير WhatsApp</th>
-                                <th>وصل الدفع</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 5: Teachers -->
-        <div id="teachers" class="tab-content">
-            <div class="card">
-                <h2>إضافة أستاذ جديد</h2>
-                <form id="teacherForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>اسم الأستاذ</label>
-                            <input type="text" id="tcName" required>
-                        </div>
-                        <div class="form-group">
-                            <label>المادة</label>
-                            <input type="text" id="tcSubject" required>
-                        </div>
-                        <div class="form-group">
-                            <label>الهاتف</label>
-                            <input type="tel" id="tcPhone" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn" style="margin-top: 12px; width: 100%;">تسجيل الأستاذ</button>
-                </form>
-            </div>
-            <div class="card">
-                <h2>لائحة الأساتذة</h2>
-                <div class="table-responsive">
-                    <table id="teachersTable">
-                        <thead>
-                            <tr>
-                                <th>الاسم</th>
-                                <th>المادة</th>
-                                <th>الهاتف</th>
-                                <th>حذف</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- Modal Receipt -->
-    <div id="receiptModal" class="modal">
-        <div class="modal-content">
-            <h2 style="color: var(--primary-color);">أكاديمية إسهام</h2>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 15px;">وصل إثبات أداء الواجب الشهري</p>
-            <hr style="margin-bottom: 15px; border: 0; border-top: 1px solid #ddd;">
-            <div style="text-align: right; font-size: 0.9rem; line-height: 1.8;">
-                <p><strong>اسم التلميذ:</strong> <span id="recName"></span></p>
-                <p><strong>المجموعة:</strong> <span id="recGroup"></span></p>
-                <p><strong>المبلغ المستلم:</strong> <span id="recFee"></span> DH</p>
-                <p><strong>التاريخ:</strong> <span id="recDate"></span></p>
-                <p><strong>حالة الأداء:</strong> <span style="color: green; font-weight: bold;">مؤدى بنجاح</span></p>
-            </div>
-            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
-            <button class="btn btn-success no-print" onclick="window.print()">طباعة الوصل 🖨️</button>
-            <button class="btn btn-danger no-print" onclick="closeModal()">إغلاق</button>
-        </div>
-    </div>
-
-    <footer class="no-print">
-        نظام إدارة أكاديمية إسهام &copy; جميع الحقوق محفوظة
-    </footer>
-
-    <script>
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
-        }
-
-        let students = JSON.parse(localStorage.getItem('issham_students_v3')) || [];
-        let teachers = JSON.parse(localStorage.getItem('issham_teachers_v3')) || [];
-
-        function updateStats() {
-            document.getElementById('totalStudents').innerText = students.length;
-            const rev = students.reduce((acc, curr) => acc + Number(curr.fee), 0);
-            document.getElementById('totalRevenue').innerText = rev + ' DH';
-            
-            const paid = students.filter(s => s.paid).length;
-            document.getElementById('paidCount').innerText = paid;
-
-            const present = students.filter(s => s.attended).length;
-            const rate = students.length ? Math.round((present / students.length) * 100) : 0;
-            document.getElementById('attendanceRate').innerText = rate + '%';
-        }
-
-        function renderStudents() {
-            const query = document.getElementById('searchStudent')?.value.toLowerCase() || '';
-            const tbody = document.querySelector('#studentsTable tbody');
-            tbody.innerHTML = '';
-            
-            students.filter(s => s.name.toLowerCase().includes(query) || s.group.toLowerCase().includes(query))
-            .forEach((s, i) => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${s.name}</td>
-                        <td>${s.level}</td>
-                        <td>${s.group}</td>
-                        <td>${s.phone}</td>
-                        <td>${s.fee} DH</td>
-                        <td><button class="btn btn-danger" onclick="deleteStudent(${i})">حذف</button></td>
-                    </tr>
-                `;
-            });
-            updateStats();
-            renderAttendance();
-            renderPayments();
-        }
-
-        function renderAttendance() {
-            const tbody = document.querySelector('#attendanceTable tbody');
-            tbody.innerHTML = '';
-            students.forEach((s, i) => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${s.name}</td>
-                        <td>${s.group}</td>
-                        <td><span class="badge ${s.attended ? 'badge-paid' : 'badge-unpaid'}">${s.attended ? 'حاضر' : 'غائب'}</span></td>
-                        <td>
-                            <button class="btn btn-success" onclick="toggleAttendance(${i}, true)">حضور</button>
-                            <button class="btn btn-danger" onclick="toggleAttendance(${i}, false)">غياب</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-
-        function renderPayments() {
-            const tbody = document.querySelector('#paymentsTable tbody');
-            tbody.innerHTML = '';
-            students.forEach((s, i) => {
-                const waMsg = encodeURIComponent(`السلام عليكم ولي أمر التلميذ(ة) ${s.name}، نود تذكيركم بالواجب الشهري الخاص بأكاديمية إسهام (${s.fee} DH). وشكراً.`);
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${s.name}</td>
-                        <td>${s.fee} DH</td>
-                        <td>
-                            <span class="badge ${s.paid ? 'badge-paid' : 'badge-unpaid'}" onclick="togglePayment(${i})" style="cursor:pointer">
-                                ${s.paid ? 'تم الأداء' : 'غير مؤدى'}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="https://wa.me/${s.phone}?text=${waMsg}" target="_blank" class="btn btn-wa">إرسال 💬</a>
-                        </td>
-                        <td>
-                            <button class="btn" onclick="openReceipt(${i})">وصل 📄</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-
-        function renderTeachers() {
-            const tbody = document.querySelector('#teachersTable tbody');
-            tbody.innerHTML = '';
-            teachers.forEach((t, i) => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${t.name}</td>
-                        <td>${t.subject}</td>
-                        <td>${t.phone}</td>
-                        <td><button class="btn btn-danger" onclick="deleteTeacher(${i})">حذف</button></td>
-                    </tr>
-                `;
-            });
-        }
-
-        document.getElementById('studentForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            students.push({
-                name: document.getElementById('stName').value,
-                level: document.getElementById('stLevel').value,
-                group: document.getElementById('stGroup').value,
-                phone: document.getElementById('stPhone').value,
-                fee: document.getElementById('stFee').value,
-                paid: false,
-                attended: false
-            });
-            localStorage.setItem('issham_students_v3', JSON.stringify(students));
-            renderStudents();
-            this.reset();
-        });
-
-        document.getElementById('teacherForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            teachers.push({
-                name: document.getElementById('tcName').value,
-                subject: document.getElementById('tcSubject').value,
-                phone: document.getElementById('tcPhone').value
-            });
-            localStorage.setItem('issham_teachers_v3', JSON.stringify(teachers));
-            renderTeachers();
-            this.reset();
-        });
-
-        function toggleAttendance(i, status) {
-            students[i].attended = status;
-            localStorage.setItem('issham_students_v3', JSON.stringify(students));
-            renderStudents();
-        }
-
-        function togglePayment(i) {
-            students[i].paid = !students[i].paid;
-            localStorage.setItem('issham_students_v3', JSON.stringify(students));
-            renderStudents();
-        }
-
-        function deleteStudent(i) {
-            students.splice(i, 1);
-            localStorage.setItem('issham_students_v3', JSON.stringify(students));
-            renderStudents();
-        }
-
-        function deleteTeacher(i) {
-            teachers.splice(i, 1);
-            localStorage.setItem('issham_teachers_v3', JSON.stringify(teachers));
-            renderTeachers();
-        }
-
-        function openReceipt(i) {
-            const s = students[i];
-            document.getElementById('recName').innerText = s.name;
-            document.getElementById('recGroup').innerText = s.group;
-            document.getElementById('recFee').innerText = s.fee;
-            document.getElementById('recDate').innerText = new Date().toLocaleDateString('ar-MA');
-            document.getElementById('receiptModal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('receiptModal').style.display = 'none';
-        }
-
-        function exportToCSV() {
-            let csv = 'الاسم الكامل,المستوى,المجموعة,الهاتف,المبلغ\n';
-            students.forEach(s => {
-                csv += `${s.name},${s.level},${s.group},${s.phone},${s.fee}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'تلاميذ_أكاديمية_إسهام.csv';
-            link.click();
-        }
-
-        renderStudents();
-        renderTeachers();
-    </script>
-</body>
-</html>
-
+  // 5. تصدير الجدول إلى PDF
+  window.exportToPDF = function() {
+    if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.text("Esham Academy - Student List", 14, 15);
+    
+    const tableData = localStudentsData.map(s => [s.name, s.level, s.group, s.phone, s.fee]);
+    doc.autoTable({
+      head: [['Name', 'Level', 'Group', 'Phone', 'Fee']],
+      body: tableData,
+      startY: 20
+    });
+    doc.save("student_list.pdf");
+  };
+</script>
