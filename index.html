@@ -1,96 +1,277 @@
-<!-- استدعاء المكتبات الضرورية (Firebase + Excel + PDF) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.autotable.min.js"></script>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أكاديمية إسهام - إدارة التلاميذ</title>
+  <style>
+    :root {
+      --primary-color: #1a56db;
+      --secondary-color: #0e9f6e;
+      --bg-color: #f3f4f6;
+      --card-bg: #ffffff;
+      --text-color: #1f2937;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 15px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      color: white;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    .btn-submit { background-color: var(--primary-color); width: 100%; }
+    .btn-excel { background-color: #16a34a; }
+    .btn-pdf { background-color: #dc2626; }
+    .btn-wa { background-color: #25d366; padding: 5px 10px; font-size: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #f8fafc;
+      color: var(--primary-color);
+    }
+    .table-responsive {
+      overflow-x: auto;
+    }
+  </style>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  <!-- مكتبات Excel و PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.autotable.min.js"></script>
+</head>
+<body>
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyDP3-oVC5Q9mTG4Lj0Y10TXMQmf4BKXB18",
-    authDomain: "issham-acadmy.firebaseapp.com",
-    projectId: "issham-acadmy",
-    storageBucket: "issham-acadmy.firebasestorage.app",
-    messagingSenderId: "3012980900",
-    appId: "1:3012980900:web:95dd7347dade35626c3631",
-    measurementId: "G-9CFVEYM41T"
-  };
+  <div class="container">
+    <h1>🎓 منصة إدارة أكاديمية إسهام</h1>
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const studentsCol = collection(db, "students");
+    <!-- نموذج إضافة تلميذ -->
+    <div class="card">
+      <h3>إضافة تلميذ جديد</h3>
+      <form id="studentForm" onsubmit="addStudent(event)">
+        <div class="form-group">
+          <label>الاسم الكامل والتلميذ(ة):</label>
+          <input type="text" id="studentName" required placeholder="مثال: محمد العلوي">
+        </div>
+        <div class="form-group">
+          <label>المستوى الدراسي:</label>
+          <input type="text" id="studentLevel" required placeholder="مثال: الثالثة إعدادي">
+        </div>
+        <div class="form-group">
+          <label>المجموعة / الفصل:</label>
+          <input type="text" id="studentGroup" required placeholder="مثال: المجموعة A">
+        </div>
+        <div class="form-group">
+          <label>رقم هاتف ولي الأمر:</label>
+          <input type="tel" id="parentPhone" required placeholder="مثال: 0612345678">
+        </div>
+        <div class="form-group">
+          <label>المبلغ الشهري (درهم):</label>
+          <input type="number" id="monthlyFee" required placeholder="مثال: 300">
+        </div>
+        <button type="submit" class="btn-submit">حفظ التلميذ أونلاين 💾</button>
+      </form>
+    </div>
 
-  let localStudentsData = [];
+    <!-- أزرار التصدير وقائمة التلاميذ -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <h3>لائحة التلاميذ المسجلين</h3>
+        <div class="btn-group" style="margin: 0;">
+          <button type="button" class="btn-excel" onclick="exportToExcel()">تصدير Excel 📊</button>
+          <button type="button" class="btn-pdf" onclick="exportToPDF()">تصدير PDF 📄</button>
+        </div>
+      </div>
 
-  // 1. التحديث التلقائي المباشر (كيبان عند كلشي فالحين)
-  onSnapshot(studentsCol, (snapshot) => {
-    localStudentsData = [];
-    snapshot.forEach(doc => {
-      localStudentsData.push({ id: doc.id, ...doc.data() });
-    });
-    renderStudentsTable(localStudentsData);
-  });
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>الاسم الكامل</th>
+              <th>المستوى</th>
+              <th>المجموعة</th>
+              <th>الهاتف</th>
+              <th>المبلغ الشهري</th>
+              <th>تواصل</th>
+            </tr>
+          </thead>
+          <tbody id="studentsTableBody">
+            <tr>
+              <td colspan="6">جاري تحميل البيانات...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-  // 2. دالة إضافة تلميذ جديد لـ Firebase
-  window.addStudent = async function(event) {
-    event.preventDefault();
-    const name = document.getElementById("studentName").value;
-    const level = document.getElementById("studentLevel").value;
-    const group = document.getElementById("studentGroup").value;
-    const phone = document.getElementById("parentPhone").value;
-    const fee = document.getElementById("monthlyFee").value;
+  <!-- سكربت الربط الحسي والتلقائي مع Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    try {
-      await addDoc(studentsCol, {
-        name, level, group, phone, fee,
-        createdAt: new Date()
+    const firebaseConfig = {
+      apiKey: "AIzaSyDP3-oVC5Q9mTG4Lj0Y10TXMQmf4BKXB18",
+      authDomain: "issham-acadmy.firebaseapp.com",
+      projectId: "issham-acadmy",
+      storageBucket: "issham-acadmy.firebasestorage.app",
+      messagingSenderId: "3012980900",
+      appId: "1:3012980900:web:95dd7347dade35626c3631",
+      measurementId: "G-9CFVEYM41T"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const studentsCol = collection(db, "students");
+
+    let localStudentsData = [];
+
+    // التحديث التلقائي المباشر من قاعدة البيانات
+    onSnapshot(studentsCol, (snapshot) => {
+      localStudentsData = [];
+      snapshot.forEach(doc => {
+        localStudentsData.push({ id: doc.id, ...doc.data() });
       });
-      alert("تم تسجيل التلميذ بنجاح فـ قاعدة البيانات!");
-      document.getElementById("studentForm").reset();
-    } catch (e) {
-      alert("حدث خطأ أثناء الحفظ: " + e.message);
-    }
-  };
-
-  // 3. دالة إرسال رسالة الواتساب وتنظيف الرقم تلقائياً
-  window.sendWhatsApp = function(phoneName, studentName) {
-    let cleanPhone = phoneName.replace(/\D/g, ''); 
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '212' + cleanPhone.slice(1);
-    }
-    const message = `السلام عليكم، بخصوص التلميذ(ة) ${studentName} فـ أكاديمية إسهام...`;
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
-  };
-
-  // 4. تصدير الجدول إلى Excel
-  window.exportToExcel = function() {
-    if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
-    const ws = XLSX.utils.json_to_sheet(localStudentsData.map(s => ({
-      "الاسم الكامل": s.name,
-      "المستوى الدراسي": s.level,
-      "المجموعة": s.group,
-      "هاتف ولي الأمر": s.phone,
-      "المبلغ الشهري": s.fee
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "التلاميذ");
-    XLSX.writeFile(wb, "لائحة_تلاميذ_أكاديمية_إسهام.xlsx");
-  };
-
-  // 5. تصدير الجدول إلى PDF
-  window.exportToPDF = function() {
-    if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.text("Esham Academy - Student List", 14, 15);
-    
-    const tableData = localStudentsData.map(s => [s.name, s.level, s.group, s.phone, s.fee]);
-    doc.autoTable({
-      head: [['Name', 'Level', 'Group', 'Phone', 'Fee']],
-      body: tableData,
-      startY: 20
+      renderStudentsTable(localStudentsData);
     });
-    doc.save("student_list.pdf");
-  };
-</script>
+
+    // دالة عرض الجدول فـ الصفحة
+    function renderStudentsTable(data) {
+      const tbody = document.getElementById("studentsTableBody");
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6">لا يوجد تلاميذ مسجلين حالياً</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(s => `
+        <tr>
+          <td>${s.name || ''}</td>
+          <td>${s.level || ''}</td>
+          <td>${s.group || ''}</td>
+          <td>${s.phone || ''}</td>
+          <td>${s.fee ? s.fee + ' درهم' : ''}</td>
+          <td>
+            <button class="btn-wa" onclick="sendWhatsApp('${s.phone}', '${s.name}')">واتساب 💬</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // إضافة تلميذ
+    window.addStudent = async function(event) {
+      event.preventDefault();
+      const name = document.getElementById("studentName").value;
+      const level = document.getElementById("studentLevel").value;
+      const group = document.getElementById("studentGroup").value;
+      const phone = document.getElementById("parentPhone").value;
+      const fee = document.getElementById("monthlyFee").value;
+
+      try {
+        await addDoc(studentsCol, {
+          name, level, group, phone, fee,
+          createdAt: new Date()
+        });
+        alert("تم حفظ التلميذ بنجاح فـ قاعدة البيانات أونلاين!");
+        document.getElementById("studentForm").reset();
+      } catch (e) {
+        alert("حدث خطأ أثناء الحفظ: " + e.message);
+      }
+    };
+
+    // إرسال واتساب
+    window.sendWhatsApp = function(phone, studentName) {
+      if (!phone) return alert("رقم الهاتف غير متوفر");
+      let cleanPhone = phone.replace(/\D/g, ''); 
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '212' + cleanPhone.slice(1);
+      }
+      const message = `السلام عليكم، بخصوص التلميذ(ة) ${studentName} فـ أكاديمية إسهام...`;
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+    };
+
+    // تصدير Excel
+    window.exportToExcel = function() {
+      if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
+      const ws = XLSX.utils.json_to_sheet(localStudentsData.map(s => ({
+        "الاسم الكامل": s.name,
+        "المستوى الدراسي": s.level,
+        "المجموعة": s.group,
+        "هاتف ولي الأمر": s.phone,
+        "المبلغ الشهري": s.fee
+      })));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "التلاميذ");
+      XLSX.writeFile(wb, "لائحة_تلاميذ_أكاديمية_إسهام.xlsx");
+    };
+
+    // تصدير PDF
+    window.exportToPDF = function() {
+      if (localStudentsData.length === 0) return alert("لا توجد بيانات للتصدير");
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("Esham Academy - Student List", 14, 15);
+      
+      const tableData = localStudentsData.map(s => [s.name, s.level, s.group, s.phone, s.fee]);
+      doc.autoTable({
+        head: [['Name', 'Level', 'Group', 'Phone', 'Fee']],
+        body: tableData,
+        startY: 20
+      });
+      doc.save("student_list.pdf");
+    };
+  </script>
+</body>
+</html>
