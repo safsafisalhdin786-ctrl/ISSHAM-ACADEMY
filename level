@@ -1,0 +1,266 @@
+/**
+ * ==============================================================================
+ * 🏫 نظام إدارة مؤسسة الدعم والتدريس الشامل (School Management System)
+ * ==============================================================================
+ * المميزات:
+ * 1. تسجيل التلاميذ (الاسم والنسب، المستوى، نقطة الدورة السابقة، هاتف الأب، الفوج).
+ * 2. تسجيل الأساتذة (الاسم، المادة، الفوج، القاعة، التوقيت).
+ * 3. تتبع نظام الأداء الشهري تلقائياً (حساب تاريخ الاستحقاق من 23/08 إلى 23/09 مثلاً).
+ * 4. توليد لوائح الأفواج بأسماء التلاميذ وتنزيلها بصيغة PDF.
+ * 5. إرسال وصل التسجيل والتنبيهات التلقائية عبر WhatsApp API.
+ * ==============================================================================
+ */
+
+// ⚙️ 1. إعدادات المؤسسة وخدمة الواتساب
+const CONFIG = {
+  INSTITUTION_NAME: "أكاديمية إسهام للدعم والتدريس",
+  WHATSAPP_INSTANCE_ID: "YOUR_INSTANCE_ID", // ضع هنا Instance ID الخاص بـ WhatsApp API
+  WHATSAPP_TOKEN: "YOUR_TOKEN",             // ضع هنا Token الخاص بك
+  CURRENCY: "درهم"
+};
+
+// ==========================================
+// 2. إنشاء الجداول وقاعدة البيانات تلقائياً
+// ==========================================
+function setupDatabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // جدول التلاميذ
+  let studentsSheet = ss.getSheetByName("التلاميذ") || ss.insertSheet("التلاميذ");
+  if (studentsSheet.getLastRow() === 0) {
+    studentsSheet.appendRow([
+      "رقم التسجيل", 
+      "الاسم والنسب", 
+      "المستوى الدراسي", 
+      "نقطة الدورة السابقة", 
+      "هاتف الأب", 
+      "الفوج", 
+      "تاريخ التسجيل", 
+      "حالة التسجيل"
+    ]);
+    studentsSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#1c4587").setFontColor("#ffffff");
+  }
+
+  // جدول الأداءات والشهريات
+  let paymentsSheet = ss.getSheetByName("الأداءات والشهريات") || ss.insertSheet("الأداءات والشهريات");
+  if (paymentsSheet.getLastRow() === 0) {
+    paymentsSheet.appendRow([
+      "معرف الدفع", 
+      "رقم التسجيل", 
+      "اسم التلميذ", 
+      "تاريخ الأداء", 
+      "تاريخ الاستحقاق القادم", 
+      "المبلغ (DH)", 
+      "حالة الأداء", 
+      "تاريخ إشعارات الواتساب"
+    ]);
+    paymentsSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#274e13").setFontColor("#ffffff");
+  }
+
+  // جدول الأساتذة والأقسام
+  let teachersSheet = ss.getSheetByName("الأساتذة والأقسام") || ss.insertSheet("الأساتذة والأقسام");
+  if (teachersSheet.getLastRow() === 0) {
+    teachersSheet.appendRow([
+      "معرف الأستاذ", 
+      "اسم الأستاذ", 
+      "المادة", 
+      "اسم الفوج / القسم", 
+      "رقم القاعة", 
+      "التوقيت الأسبوعي"
+    ]);
+    teachersSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#783f04").setFontColor("#ffffff");
+  }
+
+  SpreadsheetApp.getUi().alert("✅ تم إعداد قاعدة البيانات والجداول بنجاح!");
+}
+
+// ==========================================
+// 3. تسجيل تلميذ جديد واستخراج تاريخ الاستحقاق
+// ==========================================
+function registerNewStudent(name, level, lastGrade, parentPhone, groupName, amountPaid) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const studentsSheet = ss.getSheetByName("التلاميذ");
+  const paymentsSheet = ss.getSheetByName("الأداءات والشهريات");
+  
+  const studentId = "STD-" + Math.floor(100000 + Math.random() * 900000);
+  const today = new Date();
+  
+  // حساب تاريخ الاستحقاق للشهر القادم تلقائياً (مثلاً: 23/08 -> 23/09)
+  const nextDueDate = new Date(today);
+  nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+
+  // إدراج بيانات التلميذ
+  studentsSheet.appendRow([
+    studentId, 
+    name, 
+    level, 
+    lastGrade, 
+    formatPhoneNumber(parentPhone), 
+    groupName, 
+    today, 
+    "مسجل"
+  ]);
+  
+  // تسجيل أول شهرية
+  const paymentId = "PAY-" + Math.floor(1000 + Math.random() * 9000);
+  paymentsSheet.appendRow([
+    paymentId, 
+    studentId, 
+    name, 
+    today, 
+    nextDueDate, 
+    amountPaid, 
+    "خالص", 
+    "تم إرسال وصل التسجيل"
+  ]);
+
+  // إرسال وصل التسجيل عبر الواتساب للأب
+  sendWhatsAppReceipt(parentPhone, name, studentId, amountPaid, nextDueDate);
+}
+
+// ==========================================
+// 4. تسجيل الأستاذ وتحديد قسمه والفوج
+// ==========================================
+function registerTeacher(name, subject, groupName, classroom, schedule) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const teachersSheet = ss.getSheetByName("الأساتذة والأقسام");
+  
+  const teacherId = "TCH-" + Math.floor(1000 + Math.random() * 9000);
+  teachersSheet.appendRow([teacherId, name, subject, groupName, classroom, schedule]);
+}
+
+// ==========================================
+// 5. فحص تلقائي لموعد الدفع وإرسال التنبيهات (Cron Job)
+// ==========================================
+function checkMonthlyPaymentsAndNotify() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const paymentsSheet = ss.getSheetByName("الأداءات والشهريات");
+  const studentsSheet = ss.getSheetByName("التلاميذ");
+  
+  const paymentsData = paymentsSheet.getDataRange().getValues();
+  const studentsData = studentsSheet.getDataRange().getValues();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  for (let i = 1; i < paymentsData.length; i++) {
+    let dueDate = new Date(paymentsData[i][4]);
+    dueDate.setHours(0,0,0,0);
+    let currentStatus = paymentsData[i][6];
+    let studentId = paymentsData[i][1];
+
+    // حلول أو تجاوز تاريخ الاستحقاق والشهرية غير مدفوعة
+    if (today >= dueDate && currentStatus === "خالص") {
+      paymentsSheet.getRange(i + 1, 7).setValue("غير خالص (واجب الدفع)");
+      
+      // جلب رقم هاتف الأب
+      let parentPhone = "";
+      for (let j = 1; j < studentsData.length; j++) {
+        if (studentsData[j][0] === studentId) {
+          parentPhone = studentsData[j][4];
+          break;
+        }
+      }
+      
+      if (parentPhone !== "") {
+        const studentName = paymentsData[i][2];
+        const formattedDate = Utilities.formatDate(dueDate, "GMT+1", "yyyy-MM-dd");
+        
+        const message = `السلام عليكم ورحمة الله وبركاته،\nنحيطكم علماً بأن الواجب الشهري الخاص بالتلميذ(ة) *${studentName}* قد استحق بتاريخ *${formattedDate}*.\nنرجو منكم التسديد في أقرب وقت متاح.\n\nشكراً لتعاونكم مع ${CONFIG.INSTITUTION_NAME}.`;
+        
+        sendWhatsAppMessage(parentPhone, message);
+        paymentsSheet.getRange(i + 1, 8).setValue("تم إرسال تذكير الاستحقاق بتاريخ: " + Utilities.formatDate(today, "GMT+1", "yyyy-MM-dd"));
+      }
+    }
+  }
+}
+
+// ==========================================
+// 6. استخراج لوائح الأفواج بصيغة PDF
+// ==========================================
+function exportGroupToPDF(groupName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const studentsSheet = ss.getSheetByName("التلاميذ");
+  const data = studentsSheet.getDataRange().getValues();
+
+  // إنشاء مستند Google Doc مؤقت لبناء الجدول
+  const doc = DocumentApp.create("لائحة_تلاميذ_فوج_" + groupName);
+  const body = doc.getBody();
+  
+  body.appendParagraph(CONFIG.INSTITUTION_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  body.appendParagraph("لائحة التلاميذ المسجلين في فوج: " + groupName).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  body.appendParagraph("تاريخ صدور اللائحة: " + Utilities.formatDate(new Date(), "GMT+1", "yyyy-MM-dd"));
+  body.appendParagraph("--------------------------------------------------");
+
+  let tableData = [["رقم التسجيل", "الاسم والنسب", "المستوى الدراسي", "نقطة الدورة", "هاتف الأب"]];
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][5] === groupName) {
+      tableData.push([data[i][0], data[i][1], data[i][2], data[i][3], data[i][4]]);
+    }
+  }
+
+  if (tableData.length > 1) {
+    const table = body.appendTable(tableData);
+    table.setBorderWidth(1);
+  } else {
+    body.appendParagraph("لا يوجد تلاميذ مسجلين في هذا الفوج حالياً.");
+  }
+
+  doc.saveAndClose();
+
+  // التحويل إلى PDF والحفظ في Google Drive
+  const pdfBlob = DriveApp.getFileById(doc.getId()).getAs("application/pdf");
+  const pdfFile = DriveApp.createFile(pdfBlob).setName("لائحة_فوج_" + groupName + ".pdf");
+  
+  // حذف المستند المؤقت
+  DriveApp.getFileById(doc.getId()).setTrashed(true);
+
+  Logger.log("تم إنشاء ملف PDF بنجاح: " + pdfFile.getUrl());
+  return pdfFile.getUrl();
+}
+
+// ==========================================
+// 7. إرسال وتنسيق رسائل WhatsApp API
+// ==========================================
+function sendWhatsAppReceipt(phone, studentName, studentId, amountPaid, nextDueDate) {
+  const formattedDate = Utilities.formatDate(nextDueDate, "GMT+1", "yyyy-MM-dd");
+  const message = `مرحباً بكم في *${CONFIG.INSTITUTION_NAME}* 🏫\n\nتم تسجيل التلميذ(ة): *${studentName}*\nرقم التسجيل: *${studentId}*\nالمبلغ المؤدى: *${amountPaid} ${CONFIG.CURRENCY}*\nتاريخ استحقاق الشهر القادم: *${formattedDate}*\n\nنشكركم على ثقتكم بنا!`;
+  
+  sendWhatsAppMessage(phone, message);
+}
+
+function sendWhatsAppMessage(phone, message) {
+  if (!CONFIG.WHATSAPP_INSTANCE_ID || CONFIG.WHATSAPP_INSTANCE_ID === "YOUR_INSTANCE_ID") {
+    Logger.log("⚠️ يرجى ضبط مفاتيح WhatsApp API في CONFIG أولاً.");
+    return;
+  }
+
+  const url = `https://api.ultramsg.com/${CONFIG.WHATSAPP_INSTANCE_ID}/messages/chat`;
+  const payload = {
+    "token": CONFIG.WHATSAPP_TOKEN,
+    "to": phone,
+    "body": message
+  };
+
+  const options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    UrlFetchApp.fetch(url, options);
+  } catch (e) {
+    Logger.log("خطأ في إرسال الواتساب: " + e.toString());
+  }
+}
+
+// تنسيق رقم الهاتف للصيغة الدولية (+212)
+function formatPhoneNumber(phone) {
+  let cleaned = ("" + phone).replace(/\D/g, '');
+  if (cleaned.startsWith("0")) {
+    cleaned = "212" + cleaned.substring(1);
+  }
+  return cleaned;
+}
