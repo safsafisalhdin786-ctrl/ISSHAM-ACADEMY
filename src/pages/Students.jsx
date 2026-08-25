@@ -65,6 +65,24 @@ export default function Students() {
     }
   };
 
+  const sendWhatsAppMessage = (phone, studentName, fee) => {
+    if (!phone) return alert('رقم الهاتف غير متوفر!');
+    
+    // تنظيف رقم الهاتف وإضافة رمز الدولة المغربي (+212) تلقائياً إذا لزم الأمر
+    let formattedPhone = phone.trim().replace(/\s+/g, '').replace(/-/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '212' + formattedPhone.substring(1);
+    } else if (formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.substring(1);
+    }
+
+    const message = encodeURIComponent(
+      `السلام عليكم ورحمة الله،\n\nنحييكم من إدارة *أكاديمية إسهام* 🏫.\nنود تذكيركم بالواجب الشهري الخاص بالتلميذ(ة) *${studentName}* والمحدد في *${fee} درهم*.\n\nنتمنى لكم ولابنكم/ابنتكم دوام التوفيق والنجاح. 🌹`
+    );
+
+    window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
+  };
+
   const filteredStudents = students.filter(s => 
     s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.level?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -85,11 +103,11 @@ export default function Students() {
             placeholder="🔍 البحث عن تلميذ أو مستوى..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
           />
           <button 
             onClick={() => { setShowAddForm(!showAddForm); setEditingId(null); }}
-            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition shadow-sm font-semibold whitespace-nowrap"
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition shadow-sm font-semibold text-sm whitespace-nowrap"
           >
             {showAddForm ? 'إلغاء' : '+ تسجيل تلميذ'}
           </button>
@@ -101,9 +119,9 @@ export default function Students() {
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-amber-200 space-y-4">
           <h3 className="text-lg font-bold text-slate-800 border-b pb-2">{editingId ? 'تعديل بيانات التلميذ' : 'إضافة تلميذ جديد'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <input type="text" placeholder="الاسم الكامل" value={form.fullName} onChange={e=>setForm({...form, fullName: e.target.value})} required className="p-2.5 border rounded-lg" />
+            <input type="text" placeholder="الاسم الكامل" value={form.fullName} onChange={e=>setForm({...form, fullName: e.target.value})} required className="p-2.5 border rounded-lg text-sm" />
             
-            <select value={form.level} onChange={e=>setForm({...form, level: e.target.value})} className="p-2.5 border rounded-lg bg-white">
+            <select value={form.level} onChange={e=>setForm({...form, level: e.target.value})} className="p-2.5 border rounded-lg bg-white text-sm">
               <option value="الأول ابتدائي">الأول ابتدائي</option>
               <option value="الثاني ابتدائي">الثاني ابتدائي</option>
               <option value="الثالث ابتدائي">الثالث ابتدائي</option>
@@ -118,20 +136,20 @@ export default function Students() {
               <option value="الثانية باكالوريا">الثانية باكالوريا</option>
             </select>
 
-            <input type="text" placeholder="المواد (مثال: الرياضيات، الفيزياء)" value={form.subjects} onChange={e=>setForm({...form, subjects: e.target.value})} className="p-2.5 border rounded-lg" />
-            <input type="text" placeholder="هاتف الولي" value={form.parentPhone} onChange={e=>setForm({...form, parentPhone: e.target.value})} required className="p-2.5 border rounded-lg" />
-            <input type="number" placeholder="واجب الانخراط الشهري" value={form.monthlyFee} onChange={e=>setForm({...form, monthlyFee: e.target.value})} required className="p-2.5 border rounded-lg" />
+            <input type="text" placeholder="المواد (مثال: الرياضيات، الفيزياء)" value={form.subjects} onChange={e=>setForm({...form, subjects: e.target.value})} className="p-2.5 border rounded-lg text-sm" />
+            <input type="text" placeholder="هاتف الولي" value={form.parentPhone} onChange={e=>setForm({...form, parentPhone: e.target.value})} required className="p-2.5 border rounded-lg text-sm" />
+            <input type="number" placeholder="واجب الانخراط الشهري" value={form.monthlyFee} onChange={e=>setForm({...form, monthlyFee: e.target.value})} required className="p-2.5 border rounded-lg text-sm" />
           </div>
-          <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700">
+          <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition text-sm">
             {saving ? 'جاري الحفظ...' : 'حفظ البيانات ✅'}
           </button>
         </form>
       )}
 
-      {/* Table Design matching Image */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {loading ? <div className="p-6 text-center">جاري التحميل...</div> : (
-          <table className="w-full text-right border-collapse">
+      {/* Table Design */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+        {loading ? <div className="p-6 text-center text-slate-500 font-bold">جاري التحميل...</div> : (
+          <table className="w-full text-right border-collapse min-w-[650px]">
             <thead className="bg-slate-50 text-slate-600 font-semibold border-b text-sm">
               <tr>
                 <th className="p-4">الاسم الكامل</th>
@@ -139,27 +157,42 @@ export default function Students() {
                 <th className="p-4">المواد</th>
                 <th className="p-4">الهاتف</th>
                 <th className="p-4">الواجب الشهري</th>
-                <th className="p-4 text-center">الإجراءات</th>
+                <th className="p-4 text-center">التواصل والعمليات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredStudents.map(s => (
-                <tr key={s.id} className="hover:bg-slate-50 transition">
-                  <td className="p-4 font-bold text-slate-800">{s.fullName}</td>
-                  <td className="p-4 text-slate-600">{s.level}</td>
-                  <td className="p-4">
-                    <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-md font-semibold text-xs">
-                      {s.subjects || 'الرياضيات'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-600" dir="ltr">{s.parentPhone}</td>
-                  <td className="p-4 font-bold text-emerald-600">{s.monthlyFee} درهم</td>
-                  <td className="p-4 text-center">
-                    <button onClick={() => handleEdit(s)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded ml-2">✏️</button>
-                    <button onClick={() => handleDelete(s.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded">🗑️</button>
-                  </td>
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-6 text-center text-slate-400">لا يوجد تلاميذ مطابقون للبحث</td>
                 </tr>
-              ))}
+              ) : (
+                filteredStudents.map(s => (
+                  <tr key={s.id} className="hover:bg-slate-50 transition">
+                    <td className="p-4 font-bold text-slate-800">{s.fullName}</td>
+                    <td className="p-4 text-slate-600">{s.level}</td>
+                    <td className="p-4">
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-md font-semibold text-xs">
+                        {s.subjects || 'الرياضيات'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-600" dir="ltr">{s.parentPhone}</td>
+                    <td className="p-4 font-bold text-emerald-600">{s.monthlyFee} درهم</td>
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => sendWhatsAppMessage(s.parentPhone, s.fullName, s.monthlyFee)}
+                          title="إرسال تذكير عبر واتساب"
+                          className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        >
+                          💬 واتساب
+                        </button>
+                        <button onClick={() => handleEdit(s)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition" title="تعديل">✏️</button>
+                        <button onClick={() => handleDelete(s.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition" title="حذف">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}
