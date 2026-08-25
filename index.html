@@ -1,16 +1,17 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/ISSHAM-ACADEMY/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>أكاديمية إسهام - نظام الإدارة المدرسية</title>
-    <!-- تضمين Tailwind CSS لضمان تطبيق جميع التنسيقات والألوان فوراً -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module" crossorigin src="/ISSHAM-ACADEMY/assets/index-BtX1l9Pm.js"></script>
-    <link rel="stylesheet" crossorigin href="/ISSHAM-ACADEMY/assets/index-ynVPkm0J.css">
-  </head>
-  <body class="bg-gray-100 font-sans antialiased text-slate-900">
-    <div id="root"></div>
-  </body>
-</html>
+@import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+
+/* تنسيقات أساسية وافتراضية للوحة التحكم */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #f3f4f6;
+  direction: rtl;
+}
+
+/* إصلاح العرض للشاشات والمكونات */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
