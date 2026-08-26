@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
@@ -68,6 +68,23 @@ export default function Students() {
       fetchData();
     } catch (error) {
       console.error("خطأ في إضافة التلميذ:", error);
+    }
+  };
+
+  // دالة حذف التلميذ نهائياً
+  const handleDeleteStudent = async (studentId, studentName) => {
+    const confirmDelete = window.confirm(`هل أنت تأكد من رغبتك في حذف التلميذ: (${studentName}) نهائياً؟`);
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDoc(doc(db, 'students', studentId));
+      if (selectedStudent && selectedStudent.id === studentId) {
+        setSelectedStudent(null);
+      }
+      fetchData();
+    } catch (error) {
+      console.error("خطأ في حذف التلميذ:", error);
+      alert("حدث خطأ أثناء محاولة الحذف، المرجو المحاولة مرة أخرى.");
     }
   };
 
@@ -146,12 +163,21 @@ export default function Students() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setSelectedStudent(s)}
-                  className="mt-5 w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-black text-xs text-center flex justify-center items-center gap-2 cursor-pointer"
-                >
-                  📂 فتح الملف التفصيلي والتقارير
-                </button>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    onClick={() => setSelectedStudent(s)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-black text-xs text-center flex justify-center items-center gap-1 cursor-pointer"
+                  >
+                    📂 فتح الملف
+                  </button>
+                  <button
+                    onClick={() => handleDeleteStudent(s.id, s.fullName)}
+                    className="px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-black rounded-lg text-xs cursor-pointer transition border border-red-300"
+                    title="حذف التلميذ"
+                  >
+                    🗑️ حذف
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -168,7 +194,15 @@ export default function Students() {
                 <h3 className="text-2xl font-black text-slate-900">ملف التلميذ: {selectedStudent.fullName}</h3>
                 <p className="text-sm text-slate-600 font-bold">{selectedStudent.level} — {selectedStudent.schoolName || 'المؤسسة الأصلية غير محددة'}</p>
               </div>
-              <button onClick={() => setSelectedStudent(null)} className="px-3 py-1 bg-slate-200 text-slate-800 font-black rounded hover:bg-slate-300">✖ إغلاق</button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.fullName)} 
+                  className="px-3 py-1 bg-red-600 text-white font-black rounded hover:bg-red-700 text-xs"
+                >
+                  🗑️ مسح التلميذ
+                </button>
+                <button onClick={() => setSelectedStudent(null)} className="px-3 py-1 bg-slate-200 text-slate-800 font-black rounded hover:bg-slate-300 text-xs">✖ إغلاق</button>
+              </div>
             </div>
 
             <div className="space-y-5 font-bold text-slate-800 text-xs">
@@ -204,7 +238,7 @@ export default function Students() {
                     placeholder="مثال: تمت الحصة بنجاح، فهم الدرس جيداً، بدا كيتحسن..."
                     className="flex-1 p-2.5 border-2 border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600 bg-white"
                   />
-                  <button type="submit" className="px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-lg text-xs">
+                  <button type="submit" className="px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-lg text-xs cursor-pointer">
                     إضافة الملاحظة ➕
                   </button>
                 </form>
@@ -325,7 +359,7 @@ export default function Students() {
               </div>
 
               <div className="flex gap-2 pt-3 border-t">
-                <button type="submit" className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black text-sm">حفظ التلميذ ✅</button>
+                <button type="submit" className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black text-sm cursor-pointer">حفظ التلميذ ✅</button>
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2.5 bg-slate-200 text-slate-800 rounded-lg font-bold">إلغاء</button>
               </div>
             </form>
