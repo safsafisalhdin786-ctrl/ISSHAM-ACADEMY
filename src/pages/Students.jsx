@@ -261,7 +261,6 @@ export default function Students() {
   };
 
   const filteredStudents = students.filter(s => {
-    // تصفية حسب الدور إيلا كان أستاذ
     if (userRole === 'teacher' && currentUser) {
       if (s.teacherId !== currentUser.uid) return false;
     }
@@ -303,13 +302,13 @@ export default function Students() {
   return (
     <div className="space-y-6 dir-rtl pb-12 text-right">
       {/* Header & Controls */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 print:hidden">
+      <div className="bg-white p-5 rounded-xl shadow-md border border-slate-300 flex flex-col md:flex-row justify-between items-center gap-4 print:hidden">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             إدارة التلاميذ 👥
-            {showArchived && <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-xs rounded-full">الأرشيف</span>}
+            {showArchived && <span className="px-2.5 py-0.5 bg-slate-200 text-slate-800 text-xs rounded-full font-bold">الأرشيف</span>}
           </h2>
-          <p className="text-sm text-slate-500">{filteredStudents.length} تلميذ مسجل فـ القائمة الحالية</p>
+          <p className="text-sm font-bold text-slate-600">{filteredStudents.length} تلميذ مسجل في القائمة الحالية</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -318,10 +317,10 @@ export default function Students() {
             placeholder="🔍 البحث عن تلميذ..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-48 focus:ring-2 focus:ring-amber-500 text-sm focus:outline-none"
+            className="px-4 py-2 border-2 border-slate-300 rounded-lg w-full md:w-48 focus:ring-2 focus:ring-blue-600 font-bold text-slate-900 text-sm focus:outline-none shadow-sm"
           />
 
-          <select value={selectedLevelFilter} onChange={(e) => setSelectedLevelFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
+          <select value={selectedLevelFilter} onChange={(e) => setSelectedLevelFilter(e.target.value)} className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-white font-bold text-slate-800 shadow-sm cursor-pointer">
             <option value="">كل المستويات</option>
             <option value="الأول ابتدائي">الأول ابتدائي</option>
             <option value="الثاني ابتدائي">الثاني ابتدائي</option>
@@ -338,43 +337,39 @@ export default function Students() {
           </select>
 
           {userRole === 'admin' && (
-            <select value={selectedTeacherFilter} onChange={(e) => setSelectedTeacherFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
+            <select value={selectedTeacherFilter} onChange={(e) => setSelectedTeacherFilter(e.target.value)} className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-white font-bold text-slate-800 shadow-sm cursor-pointer">
               <option value="">كل الأساتذة</option>
               {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
 
-          <button onClick={() => setShowArchived(!showArchived)} className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer transition ${showArchived ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}>
+          <button onClick={() => setShowArchived(!showArchived)} className={`px-3 py-2 rounded-lg text-xs font-black border cursor-pointer transition ${showArchived ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'}`}>
             {showArchived ? '📂 النشطين' : '📁 الأرشيف'}
           </button>
 
-          <button onClick={exportToCSV} className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 cursor-pointer transition">
+          <button onClick={exportToCSV} className="px-3 py-2 bg-emerald-600 text-white font-black rounded-lg text-xs hover:bg-emerald-700 cursor-pointer transition shadow-sm">
             📊 Excel
-          </button>
-
-          <button onClick={() => window.print()} className="px-3 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 cursor-pointer transition">
-            🖨️ طباعة
           </button>
 
           <button 
             type="button"
             onClick={handleOpenAddForm} 
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition font-semibold text-sm cursor-pointer shadow-sm"
+            className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition font-black text-sm cursor-pointer shadow-md"
           >
-            {showAddForm ? 'إلغاء' : '+ تسجيل تلميذ'}
+            {showAddForm ? 'إلغاء الاستمارة ✖' : '➕ إضافة تلميذ جديد'}
           </button>
         </div>
       </div>
 
       {/* Form */}
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-amber-200 space-y-4 print:hidden">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-lg font-bold text-slate-800">{editingId ? 'تعديل بيانات التلميذ' : 'إضافة تلميذ جديد'}</h3>
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg border-2 border-blue-500 space-y-4 print:hidden">
+          <div className="flex justify-between items-center border-b-2 border-slate-200 pb-3">
+            <h3 className="text-xl font-black text-slate-900">{editingId ? 'تعديل بيانات التلميذ ✏️' : 'إضافة تلميذ جديد 👨‍🎓'}</h3>
             <button 
               type="button" 
               onClick={() => { setShowAddForm(false); setEditingId(null); }}
-              className="text-xs text-rose-600 hover:underline font-bold cursor-pointer"
+              className="px-3 py-1 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-lg font-black text-xs cursor-pointer"
             >
               إغلاق ✖
             </button>
@@ -382,13 +377,13 @@ export default function Students() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">الاسم الكامل *</label>
-              <input type="text" value={form.fullName} onChange={e=>setForm({...form, fullName: e.target.value})} required className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">الاسم الكامل *</label>
+              <input type="text" value={form.fullName} onChange={e=>setForm({...form, fullName: e.target.value})} required className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">المستوى الدراسي *</label>
-              <select value={form.level} onChange={e=>setForm({...form, level: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <label className="block text-xs font-black text-slate-800 mb-1">المستوى الدراسي *</label>
+              <select value={form.level} onChange={e=>setForm({...form, level: e.target.value})} className="w-full p-2.5 border-2 border-slate-300 rounded-lg bg-white font-bold text-slate-900 focus:outline-none focus:border-blue-600">
                 <option value="الأول ابتدائي">الأول ابتدائي</option>
                 <option value="الثاني ابتدائي">الثاني ابتدائي</option>
                 <option value="الثالث ابتدائي">الثالث ابتدائي</option>
@@ -405,67 +400,67 @@ export default function Students() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">الأستاذ(ة) المسؤول(ة)</label>
-              <select value={form.teacherId} onChange={e=>setForm({...form, teacherId: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <label className="block text-xs font-black text-slate-800 mb-1">الأستاذ(ة) المسؤول(ة)</label>
+              <select value={form.teacherId} onChange={e=>setForm({...form, teacherId: e.target.value})} className="w-full p-2.5 border-2 border-slate-300 rounded-lg bg-white font-bold text-slate-900 focus:outline-none focus:border-blue-600">
                 <option value="">-- اختر الأستاذ --</option>
                 {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.subject || 'عام'})</option>)}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">هاتف الولي (واتساب) *</label>
-              <input type="text" value={form.parentPhone} onChange={e=>setForm({...form, parentPhone: e.target.value})} required className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">هاتف الولي (واتساب) *</label>
+              <input type="text" value={form.parentPhone} onChange={e=>setForm({...form, parentPhone: e.target.value})} required className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">اسم الولي / الوصي</label>
-              <input type="text" value={form.parentName} onChange={e=>setForm({...form, parentName: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">اسم الولي / الوصي</label>
+              <input type="text" value={form.parentName} onChange={e=>setForm({...form, parentName: e.target.value})} className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">الواجب الشهري (درهم) *</label>
-              <input type="number" value={form.monthlyFee} onChange={e=>setForm({...form, monthlyFee: e.target.value})} required className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">الواجب الشهري (درهم) *</label>
+              <input type="number" value={form.monthlyFee} onChange={e=>setForm({...form, monthlyFee: e.target.value})} required className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">يوم الأداء من كل شهر</label>
-              <input type="number" min="1" max="31" value={form.paymentDay} onChange={e=>setForm({...form, paymentDay: e.target.value})} required className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">يوم الأداء من كل شهر</label>
+              <input type="number" min="1" max="31" value={form.paymentDay} onChange={e=>setForm({...form, paymentDay: e.target.value})} required className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">اسم المؤسسة التعليمية</label>
-              <input type="text" value={form.school} onChange={e=>setForm({...form, school: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <label className="block text-xs font-black text-slate-800 mb-1">اسم المؤسسة التعليمية</label>
+              <input type="text" value={form.school} onChange={e=>setForm({...form, school: e.target.value})} className="w-full p-2.5 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">الجنس</label>
-              <select value={form.gender} onChange={e=>setForm({...form, gender: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <label className="block text-xs font-black text-slate-800 mb-1">الجنس</label>
+              <select value={form.gender} onChange={e=>setForm({...form, gender: e.target.value})} className="w-full p-2.5 border-2 border-slate-300 rounded-lg bg-white font-bold text-slate-900 focus:outline-none focus:border-blue-600">
                 <option value="ذكر">ذكر</option>
                 <option value="أنثى">أنثى</option>
               </select>
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-3 space-y-3">
-            <h4 className="text-sm font-bold text-amber-800">🎯 التتبع الأكاديمي وحصص الدعم:</h4>
+          <div className="border-t-2 border-slate-200 pt-3 space-y-3">
+            <h4 className="text-sm font-black text-blue-900">🎯 التتبع الأكاديمي وحصص الدعم:</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div>
-                <label className="block font-semibold text-emerald-700 mb-1">نقاط القوة</label>
-                <input type="text" value={form.strengths} onChange={e=>setForm({...form, strengths: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <label className="block font-black text-emerald-800 mb-1">نقاط القوة</label>
+                <input type="text" value={form.strengths} onChange={e=>setForm({...form, strengths: e.target.value})} className="w-full p-2 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-emerald-600" />
               </div>
               <div>
-                <label className="block font-semibold text-rose-700 mb-1">نقاط الضعف والتعثرات</label>
-                <input type="text" value={form.weaknesses} onChange={e=>setForm({...form, weaknesses: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500" />
+                <label className="block font-black text-rose-800 mb-1">نقاط الضعف والتعثرات</label>
+                <input type="text" value={form.weaknesses} onChange={e=>setForm({...form, weaknesses: e.target.value})} className="w-full p-2 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-rose-600" />
               </div>
               <div>
-                <label className="block font-semibold text-blue-700 mb-1">الأهداف المرجوة</label>
-                <input type="text" value={form.goals} onChange={e=>setForm({...form, goals: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <label className="block font-black text-blue-800 mb-1">الأهداف المرجوة</label>
+                <input type="text" value={form.goals} onChange={e=>setForm({...form, goals: e.target.value})} className="w-full p-2 border-2 border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-blue-600" />
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">مواد الدعم المسجل فيها:</label>
+            <label className="block text-xs font-black text-slate-800 mb-2">مواد الدعم المسجل فيها:</label>
             <div className="flex flex-wrap gap-2">
               {AVAILABLE_SUBJECTS.map(subj => {
                 const isSelected = Array.isArray(form.subjects) && form.subjects.includes(subj);
@@ -474,8 +469,8 @@ export default function Students() {
                     type="button"
                     key={subj}
                     onClick={() => handleSubjectChange(subj)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
-                      isSelected ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black border-2 transition cursor-pointer ${
+                      isSelected ? 'bg-blue-700 text-white border-blue-700 shadow-md' : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
                     }`}
                   >
                     {isSelected ? '✓ ' : '+ '}{subj}
@@ -486,10 +481,10 @@ export default function Students() {
           </div>
 
           <div className="pt-2 flex items-center gap-3">
-            <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition text-sm disabled:opacity-50 cursor-pointer shadow-sm">
+            <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black transition text-sm disabled:opacity-50 cursor-pointer shadow-md">
               {saving ? 'جاري الحفظ...' : (editingId ? 'تحديث البيانات 🔄' : 'حفظ البيانات ✅')}
             </button>
-            <button type="button" onClick={() => { setShowAddForm(false); setEditingId(null); }} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 cursor-pointer">
+            <button type="button" onClick={() => { setShowAddForm(false); setEditingId(null); }} className="px-4 py-2.5 bg-slate-200 text-slate-800 rounded-lg font-black text-sm hover:bg-slate-300 cursor-pointer">
               إلغاء
             </button>
           </div>
@@ -497,10 +492,10 @@ export default function Students() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-        {loading ? <div className="p-6 text-center text-slate-500 font-bold">جاري التحميل...</div> : (
+      <div className="bg-white rounded-xl shadow-md border border-slate-300 overflow-x-auto">
+        {loading ? <div className="p-6 text-center text-slate-700 font-bold">جاري التحميل...</div> : (
           <table className="w-full text-right border-collapse min-w-[800px]">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-sm">
+            <thead className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-300 text-sm">
               <tr>
                 <th className="p-4">الاسم الكامل</th>
                 <th className="p-4">المستوى</th>
@@ -512,10 +507,10 @@ export default function Students() {
                 <th className="p-4 text-center print:hidden">التواصل والعمليات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
+            <tbody className="divide-y divide-slate-200 text-sm">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="p-6 text-center text-slate-400">لا يوجد تلاميذ مطابقون للبحث</td>
+                  <td colSpan="8" className="p-6 text-center text-slate-500 font-bold">لا يوجد تلاميذ مطابقون للبحث</td>
                 </tr>
               ) : (
                 filteredStudents.map(s => {
@@ -526,50 +521,50 @@ export default function Students() {
 
                   return (
                     <tr key={s.id} className={`hover:bg-slate-50 transition ${s.archived ? 'bg-slate-50 opacity-75' : ''}`}>
-                      <td className="p-4 font-bold text-slate-800">
+                      <td className="p-4 font-black text-slate-900">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span>{s.fullName}</span>
                             {isDue && !s.archived && (
-                              <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full animate-pulse">
+                              <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full animate-pulse border border-rose-300">
                                 ⚠️ موعد الخلاص
                               </span>
                             )}
                             {hasWeakness && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-black rounded border border-amber-300">
                                 🎯 محتاج دعم
                               </span>
                             )}
                           </div>
-                          {s.parentName && <span className="text-[11px] font-normal text-slate-400">الولي: {s.parentName}</span>}
+                          {s.parentName && <span className="text-[11px] font-semibold text-slate-500">الولي: {s.parentName}</span>}
                         </div>
                       </td>
-                      <td className="p-4 text-slate-600">{s.level}</td>
-                      <td className="p-4 text-slate-700 font-medium">{assignedTeacher ? assignedTeacher.name : 'غير محدد'}</td>
+                      <td className="p-4 text-slate-700 font-bold">{s.level}</td>
+                      <td className="p-4 text-slate-800 font-bold">{assignedTeacher ? assignedTeacher.name : 'غير محدد'}</td>
                       <td className="p-4">
-                        <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-md font-semibold text-xs inline-block">
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-900 rounded-md font-extrabold text-xs inline-block border border-blue-300">
                           {Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || 'الرياضيات')}
                         </span>
                       </td>
-                      <td className="p-4 text-slate-700 font-bold">نهار {s.paymentDay || 5} فـ الشهر</td>
-                      <td className="p-4 text-slate-600" dir="ltr">{s.parentPhone}</td>
-                      <td className="p-4 font-bold text-emerald-600">{s.monthlyFee} درهم</td>
+                      <td className="p-4 text-slate-800 font-black">نهار {s.paymentDay || 5} فـ الشهر</td>
+                      <td className="p-4 text-slate-700 font-bold" dir="ltr">{s.parentPhone}</td>
+                      <td className="p-4 font-black text-emerald-700">{s.monthlyFee} درهم</td>
                       <td className="p-4 text-center print:hidden">
                         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          <button onClick={() => setSelectedStudentForProfile(s)} className="px-2 py-1 bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 rounded-lg text-xs font-bold transition cursor-pointer">
+                          <button onClick={() => setSelectedStudentForProfile(s)} className="px-2 py-1 bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-black transition cursor-pointer">
                             📋 الملف
                           </button>
-                          <button onClick={() => sendReminder(s)} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition cursor-pointer">
+                          <button onClick={() => sendReminder(s)} className="px-2 py-1 bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300 rounded-lg text-xs font-black transition cursor-pointer">
                             🔔 تذكير
                           </button>
-                          <button onClick={() => sendReceipt(s)} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer">
+                          <button onClick={() => sendReceipt(s)} className="px-2 py-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300 rounded-lg text-xs font-black transition cursor-pointer">
                             ✅ وصل
                           </button>
-                          <button onClick={() => setConfirmModal({ show: true, action: 'archive', student: s })} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition cursor-pointer" title={s.archived ? "استعادة" : "أرشفة"}>
+                          <button onClick={() => setConfirmModal({ show: true, action: 'archive', student: s })} className="p-1.5 text-slate-700 hover:bg-slate-200 rounded transition cursor-pointer" title={s.archived ? "استعادة" : "أرشفة"}>
                             {s.archived ? '📂' : '📁'}
                           </button>
-                          <button onClick={() => handleEdit(s)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer" title="تعديل">✏️</button>
-                          <button onClick={() => setConfirmModal({ show: true, action: 'delete', student: s })} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer" title="حذف">🗑️</button>
+                          <button onClick={() => handleEdit(s)} className="p-1.5 text-blue-700 hover:bg-blue-100 rounded transition cursor-pointer" title="تعديل">✏️</button>
+                          <button onClick={() => setConfirmModal({ show: true, action: 'delete', student: s })} className="p-1.5 text-rose-700 hover:bg-rose-100 rounded transition cursor-pointer" title="حذف">🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -588,38 +583,38 @@ export default function Students() {
 
       {/* Modal التأكيد للحذف / الأرشفة */}
       {confirmModal.show && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
-            <div className={`flex items-center gap-3 ${confirmModal.action === 'delete' ? 'text-rose-600' : 'text-amber-600'}`}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border-2 border-slate-300 space-y-4">
+            <div className={`flex items-center gap-3 ${confirmModal.action === 'delete' ? 'text-rose-700' : 'text-amber-700'}`}>
               <span className="text-2xl">{confirmModal.action === 'delete' ? '⚠️' : '📂'}</span>
-              <h3 className="text-lg font-bold">
+              <h3 className="text-lg font-black">
                 {confirmModal.action === 'delete' ? 'تأكيد مسح التلميذ' : (confirmModal.student?.archived ? 'تأكيد استعادة التلميذ' : 'تأكيد أرشفة التلميذ')}
               </h3>
             </div>
             
-            <p className="text-sm text-slate-600">
+            <p className="text-sm font-bold text-slate-700">
               {confirmModal.action === 'delete' ? (
-                <>هل أنت تأكد من مسح التلميذ(ة) <strong className="text-slate-800">"{confirmModal.student?.fullName}"</strong> وكل البيانات المرتبطة بيه (الحضور، الأداءات)؟ الإجراء لا يمكن التراجع عنه.</>
+                <>هل أنت تأكد من مسح التلميذ(ة) <strong className="text-slate-900">"{confirmModal.student?.fullName}"</strong> وكل البيانات المرتبطة بيه (الحضور، الأداءات)؟ الإجراء لا يمكن التراجع عنه.</>
               ) : confirmModal.student?.archived ? (
-                <>هل تريد استعادة التلميذ(ة) <strong className="text-slate-800">"{confirmModal.student?.fullName}"</strong> للقائمة النشطة؟</>
+                <>هل تريد استعادة التلميذ(ة) <strong className="text-slate-900">"{confirmModal.student?.fullName}"</strong> للقائمة النشطة؟</>
               ) : (
-                <>هل تريد نقل التلميذ(ة) <strong className="text-slate-800">"{confirmModal.student?.fullName}"</strong> للأرشيف؟</>
+                <>هل تريد نقل التلميذ(ة) <strong className="text-slate-900">"{confirmModal.student?.fullName}"</strong> للأرشيف؟</>
               )}
             </p>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <div className="flex justify-end gap-3 pt-3 border-t-2 border-slate-200">
               <button
                 onClick={() => setConfirmModal({ show: false, action: null, student: null })}
                 disabled={processingAction}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition cursor-pointer"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-sm font-black transition cursor-pointer"
               >
                 إلغاء
               </button>
               <button
                 onClick={confirmModal.action === 'delete' ? executeDelete : executeArchive}
                 disabled={processingAction}
-                className={`px-4 py-2 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 cursor-pointer ${
-                  confirmModal.action === 'delete' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'
+                className={`px-4 py-2 text-white rounded-lg text-sm font-black transition disabled:opacity-50 cursor-pointer ${
+                  confirmModal.action === 'delete' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-amber-700 hover:bg-amber-800'
                 }`}
               >
                 {processingAction ? 'جاري المعالجة...' : (confirmModal.action === 'delete' ? 'نعم، حذف' : 'تأكيد')}
