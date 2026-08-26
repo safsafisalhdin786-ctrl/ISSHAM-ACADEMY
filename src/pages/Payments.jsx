@@ -1,515 +1,390 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp 
-} from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Payments() {
-  const [payments, setPayments] = useState([]);
   const [students, setStudents] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  
-  // حالات الفلترة والبحث
-  const [searchTerm, setSearchTerm] = useState('');
-  const [monthFilter, setMonthFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
 
-  // حالة نافذة حذف الأداء
-  const [deleteModal, setDeleteModal] = useState({ show: false, id: null, studentName: '' });
-  const [deleting, setDeleting] = useState(false);
+  // اختيار التلميذ وتفاصيل الوصل
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
+  const [month, setMonth] = useState(new Date().toLocaleString('ar-MA', { month: 'long' }));
+  const [notes, setNotes] = useState('');
 
-  // حالة الوصل المحدد للطباعة
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  // الوصل الحالي المعروض للطباعة
+  const [printedReceipt, setPrintedReceipt] = useState(null);
 
-  const [newPayment, setNewPayment] = useState({
-    studentId: '',
-    studentName: '',
-    amount: '',
-    month: new Date().toISOString().substring(0, 7), // الشهر الحالي YYYY-MM
-    status: 'مؤدى'
-  });
-
-  // جلب التلاميذ والمدفوعات من Firebase
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const [studentsSnap, paymentsSnap] = await Promise.all([
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'payments'))
       ]);
 
-      const studentsList = studentsSnap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
-      setStudents(studentsList);
+      const loadedStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.archived);
+      setStudents(loadedStudents);
 
-      const paymentsList = paymentsSnap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
-      setPayments(paymentsList);
-    } catch (error) {
-      console.error("خطأ في جلب بيانات المالية:", error);
+      const loadedPayments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPayments(loadedPayments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, []);
 
-  // اختيار تلميذ وملء اسمه ومبلغه تلقائياً
   const handleStudentSelect = (e) => {
-    const selectedId = e.target.value;
-    const selectedStudent = students.find(s => s.id === selectedId);
-    if (selectedStudent) {
-      setNewPayment(prev => ({
-        ...prev,
-        studentId: selectedId,
-        studentName: selectedStudent.fullName,
-        amount: selectedStudent.monthlyFee || ''
-      }));
-    } else {
-      setNewPayment(prev => ({ ...prev, studentId: '', studentName: '', amount: '' }));
+    const sId = e.target.value;
+    setSelectedStudentId(sId);
+    const st = students.find(s => s.id === sId);
+    if (st && st.monthlyFee) {
+      setAmountPaid(st.monthlyFee);
     }
   };
 
-  // تسجيل دفعة جديدة
-  const handleAddPayment = async (e) => {
+  const handleRegisterPayment = async (e) => {
     e.preventDefault();
-    if (!newPayment.studentId && !newPayment.studentName) return;
+    if (!selectedStudentId || !amountPaid) return alert('المرجو اختيار التلميذ والمبلغ');
 
-    setSaving(true);
+    const student = students.find(s => s.id === selectedStudentId);
+    const receiptData = {
+      receiptNo: `REC-${Date.now().toString().slice(-6)}`,
+      studentId: student.id,
+      studentName: student.fullName,
+      parentPhone: student.parentPhone || '',
+      level: student.level,
+      amount: amountPaid,
+      month: month,
+      notes: notes,
+      date: new Date().toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' }),
+      time: new Date().toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: serverTimestamp()
+    };
+
     try {
-      await addDoc(collection(db, 'payments'), {
-        ...newPayment,
-        amount: Number(newPayment.amount),
-        createdAt: serverTimestamp()
-      });
-      setShowAddForm(false);
-      setNewPayment({
-        studentId: '',
-        studentName: '',
-        amount: '',
-        month: new Date().toISOString().substring(0, 7),
-        status: 'مؤدى'
-      });
+      await addDoc(collection(db, 'payments'), receiptData);
+      setPrintedReceipt(receiptData);
+      setSelectedStudentId('');
+      setAmountPaid('');
+      setNotes('');
       fetchData();
     } catch (error) {
-      console.error("خطأ في تسجيل الواجب الشهري:", error);
-    } finally {
-      setSaving(false);
+      console.error("خطأ في تسجيل الأداء:", error);
     }
   };
 
-  // تغيير حالة الواجب
-  const toggleStatus = async (paymentId, currentStatus) => {
-    const newStatus = currentStatus === 'مؤدى' ? 'متأخر' : 'مؤدى';
-    try {
-      const paymentRef = doc(db, 'payments', paymentId);
-      await updateDoc(paymentRef, { status: newStatus });
-      fetchData();
-    } catch (error) {
-      console.error("خطأ في تغيير حالة الدفع:", error);
-    }
+  // إرسال وصل الاستلام عبر الواتساب عند تسديد الواجب
+  const sendWhatsAppReceipt = (receipt) => {
+    if (!receipt.parentPhone) return alert('رقم هاتف الولي غير متوفر لهذا التلميذ');
+    
+    const formattedPhone = receipt.parentPhone.startsWith('0') 
+      ? '212' + receipt.parentPhone.slice(1) 
+      : receipt.parentPhone;
+
+    const message = `✨ *إشعار تسديد الواجب الشهري - ISSHAAM ACADEMY* ✨
+
+السلام عليكم ورحمة الله وبركاته،
+ولي أمر التلميذ(ة): *${receipt.studentName}* (${receipt.level})
+
+نشكركم على ثقتكم الغالية فـ *ISSHAAM ACADEMY*. نود إخباركم أنه قد تم استلام الواجب الشهري بنجاح:
+📄 *رقم الوصل:* ${receipt.receiptNo}
+📅 *عن شهر:* ${receipt.month}
+💰 *المبلغ الاستلام:* ${receipt.amount} درهم
+🗓️ *تاريخ الأداء:* ${receipt.date}
+
+الحالة: ✅ *مكاشي - PAYÉ*
+
+نسأل الله بالتوفيق والنجاح لأبنائنا الكرام! 🎓
+_إدارة أركاديمية عصام للدعم والتميز_`;
+
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
-  // فتح نافذة تأكيد الحذف
-  const confirmDelete = (id, studentName) => {
-    setDeleteModal({ show: true, id, studentName });
+  // إرسال تذكير بالدفع للتلاميذ الذين لم يؤدوا بعد
+  const sendWhatsAppReminder = (student) => {
+    if (!student.parentPhone) return alert('رقم هاتف الولي غير متوفر لهذا التلميذ');
+
+    const formattedPhone = student.parentPhone.startsWith('0') 
+      ? '212' + student.parentPhone.slice(1) 
+      : student.parentPhone;
+
+    const currentMonthName = new Date().toLocaleString('ar-MA', { month: 'long' });
+
+    const message = `🌸 *تذكير لطيف بالواجب الشهري - ISSHAAM ACADEMY* 🌸
+
+السلام عليكم ورحمة الله وبركاته،
+تحية طيبة وبعد من إدارة *ISSHAAM ACADEMY*.
+
+نود تذكير ولي أمر التلميذ(ة): *${student.fullName}* (${student.level}) بأن موعد استيفاء الواجب الشهري الخاص بشهر (*${currentMonthName}*) قد حان.
+
+💰 *الواجب الشهري:* ${student.monthlyFee || '---'} درهم.
+
+شاكرين لكم حسن تعاونكم واهتمامكم الدائم بمستقبل أبنائكم معنا 🌟.
+لأي استفسار يرجى التواصل مع الإدارة.`;
+
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
-
-  // تنفيذ الحذف النهائي
-  const executeDelete = async () => {
-    if (!deleteModal.id) return;
-    setDeleting(true);
-    try {
-      await deleteDoc(doc(db, 'payments', deleteModal.id));
-      setDeleteModal({ show: false, id: null, studentName: '' });
-      fetchData();
-    } catch (error) {
-      console.error("خطأ في حذف الدفعة:", error);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  // دالة طباعة الوصل
-  const handlePrint = (payment, student) => {
-    const today = new Date().toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' });
-    setSelectedReceipt({
-      studentName: student ? student.fullName : payment.studentName,
-      level: student?.level || 'غير محدد',
-      subjects: Array.isArray(student?.subjects) ? student.subjects.join(', ') : (student?.subjects || 'الدعم المدرسي'),
-      amount: payment.amount,
-      month: payment.month,
-      date: today
-    });
-
-    setTimeout(() => {
-      window.print();
-    }, 200);
-  };
-
-  // تصفية المدفوعات
-  const filteredPayments = payments.filter(p => {
-    const currentStudent = students.find(s => s.id === p.studentId);
-    const name = currentStudent ? currentStudent.fullName : (p.studentName || '');
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMonth = monthFilter ? p.month === monthFilter : true;
-    const matchesStatus = statusFilter ? p.status === statusFilter : true;
-    return matchesSearch && matchesMonth && matchesStatus;
-  });
-
-  // حساب الإحصائيات
-  const totalPaid = payments
-    .filter(p => p.status === 'مؤدى')
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-  const totalPending = payments
-    .filter(p => p.status === 'متأخر')
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   return (
-    <div className="space-y-6 dir-rtl text-right max-w-full pb-12">
-      {/* CSS الخاص بالطباعة */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-receipt, #printable-receipt * {
-            visibility: visible;
-          }
-          #printable-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            display: block !important;
-          }
-        }
-      `}</style>
+    <div className="space-y-6 dir-rtl text-right pb-10 font-sans">
+      
+      {/* القسم العلوي لتسجيل الواجب الشهري */}
+      <div className="bg-white p-6 rounded-xl shadow-md border border-slate-300">
+        <h2 className="text-2xl font-black text-slate-900 mb-2">استلام الواجب الشهري وإرسال الوصولات 🧾</h2>
+        <p className="text-xs font-bold text-slate-600 mb-6">سجل الأداء الشهري، اطبع الوصل المـكـاشـي، وأرسل الإشعارات عبر الواتساب مباشرة</p>
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl shadow-sm border border-slate-200 gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            المالية والأداءات 💳
-          </h2>
-          <p className="text-sm text-slate-500">تتبع واستخلاص الواجبات الشهرية للتلاميذ</p>
-        </div>
-        <button 
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-bold text-sm shadow-sm cursor-pointer whitespace-nowrap flex items-center gap-2"
-        >
-          {showAddForm ? 'إلغاء' : '+ تسجيل واجب شهري'}
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-xs font-semibold text-slate-500 mb-1">إجمالي المستخلص (مؤدى)</p>
-          <p className="text-2xl font-black text-emerald-600">{totalPaid} <span className="text-sm font-normal">درهم</span></p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-xs font-semibold text-slate-500 mb-1">إجمالي المتأخرات</p>
-          <p className="text-2xl font-black text-rose-600">{totalPending} <span className="text-sm font-normal">درهم</span></p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-xs font-semibold text-slate-500 mb-1">إجمالي السجلات</p>
-          <p className="text-2xl font-black text-indigo-600">{payments.length}</p>
-        </div>
-      </div>
-
-      {/* Form */}
-      {showAddForm && (
-        <form onSubmit={handleAddPayment} className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 space-y-4">
-          <h3 className="text-md font-bold text-slate-800 border-b pb-2">تسجيل أداء جديد</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">اختر التلميذ</label>
-              <select 
-                value={newPayment.studentId}
-                onChange={handleStudentSelect}
-                required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
-              >
-                <option value="">-- اختر تلميذاً من القائمة --</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.fullName} ({s.level || 'غير محدد'})</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">الشهر المستحق</label>
-              <input 
-                type="month" 
-                value={newPayment.month} 
-                onChange={(e) => setNewPayment({...newPayment, month: e.target.value})}
-                required 
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">المبلغ (درهم)</label>
-              <input 
-                type="number" 
-                value={newPayment.amount} 
-                onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
-                placeholder="المبلغ بالدرهم"
-                required 
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">حالة الدفع</label>
-              <select 
-                value={newPayment.status}
-                onChange={(e) => setNewPayment({...newPayment, status: e.target.value})}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
-              >
-                <option value="مؤدى">مؤدى ✅</option>
-                <option value="متأخر">متأخر / غير مؤدى ⏳</option>
-              </select>
-            </div>
+        <form onSubmit={handleRegisterPayment} className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold">
+          <div>
+            <label className="block mb-1 text-slate-800">اختيار التلميذ *</label>
+            <select
+              value={selectedStudentId}
+              onChange={handleStudentSelect}
+              required
+              className="w-full p-2.5 border-2 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-blue-600"
+            >
+              <option value="">-- اختر التلميذ --</option>
+              {students.map(s => (
+                <option key={s.id} value={s.id}>{s.fullName} ({s.level})</option>
+              ))}
+            </select>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            <button 
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition font-medium text-sm cursor-pointer"
+          <div>
+            <label className="block mb-1 text-slate-800">عن شهر *</label>
+            <input
+              type="text"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              required
+              className="w-full p-2.5 border-2 rounded-lg text-slate-900"
+              placeholder="مثال: أكتوبر / نونبر"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-slate-800">المبلغ المدفوع (درهم) *</label>
+            <input
+              type="number"
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value)}
+              required
+              className="w-full p-2.5 border-2 rounded-lg text-slate-900"
+              placeholder="300"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-slate-800">ملاحظات (اختياري)</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full p-2.5 border-2 rounded-lg text-slate-900"
+              placeholder="مثال: تسقيع جزئي، واجب الدورة..."
+            />
+          </div>
+
+          <div className="md:col-span-4 mt-2">
+            <button
+              type="submit"
+              className="w-full md:w-auto px-8 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black text-sm shadow-md cursor-pointer transition"
             >
-              إلغاء
-            </button>
-            <button 
-              type="submit" 
-              disabled={saving} 
-              className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-bold text-sm shadow-sm cursor-pointer disabled:opacity-50"
-            >
-              {saving ? 'جاري الحفظ...' : 'حفظ العملية ✅'}
+              💳 تسجيل الدفع وإصدار الوصل المـكـاشـي
             </button>
           </div>
         </form>
-      )}
+      </div>
 
-      {/* Control Bar (البحث والفلترة) */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <input 
-            type="text" 
-            placeholder="🔍 البحث باسم التلميذ..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm"
-          />
-
-          <input 
-            type="month"
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer"
-          />
-
-          <select 
-            value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer"
-          >
-            <option value="">جميع الحالات</option>
-            <option value="مؤدى">مؤدى ✅</option>
-            <option value="متأخر">متأخر ⏳</option>
-          </select>
-
-          {(monthFilter || statusFilter || searchTerm) && (
-            <button
-              onClick={() => { setSearchTerm(''); setMonthFilter(''); setStatusFilter(''); }}
-              className="text-xs text-rose-600 hover:underline cursor-pointer"
-            >
-              إعادة ضبط
-            </button>
-          )}
-        </div>
-
-        <div className="text-xs font-bold text-slate-500">
-          المستعرض: <span className="text-emerald-600">{filteredPayments.length}</span> عملية
+      {/* قائمة التلاميذ والتذكير بالدفع غير المسدد */}
+      <div className="bg-white rounded-xl shadow-md border border-slate-300 p-5">
+        <h3 className="text-lg font-black text-slate-900 mb-3">📲 قائمة التلاميذ للتذكير السريع بالواتساب:</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {students.map(st => (
+            <div key={st.id} className="p-3 border rounded-lg bg-slate-50 flex justify-between items-center text-xs font-bold">
+              <div>
+                <p className="text-slate-900 font-black">{st.fullName}</p>
+                <p className="text-slate-500">{st.level} - {st.monthlyFee || 0} درهم</p>
+              </div>
+              <button
+                onClick={() => sendWhatsAppReminder(st)}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-[11px] flex items-center gap-1"
+              >
+                📱 تذكير بالأداء
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* سجل المقبوضات والعمليات السابقة */}
+      <div className="bg-white rounded-xl shadow-md border border-slate-300 p-5">
+        <h3 className="text-xl font-black text-slate-900 mb-4 border-b pb-2">سجل الوصولات المنجزة والأداءات 📜</h3>
+
         {loading ? (
-          <div className="p-6 text-center text-slate-500 font-bold">جاري تحميل سجلات المالية...</div>
-        ) : filteredPayments.length === 0 ? (
-          <div className="p-6 text-center text-slate-400">لا توجد عمليات دفع مسجلة مطابقة.</div>
-        ) : (
+          <p className="text-center font-bold text-slate-600 py-4">جاري تحميل سجل الأداءات...</p>
+        ) : payments.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse min-w-[650px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 font-bold">
-                <tr>
-                  <th className="p-4">اسم التلميذ</th>
-                  <th className="p-4">الشهر المستحق</th>
-                  <th className="p-4">المبلغ</th>
-                  <th className="p-4">الحالة</th>
-                  <th className="p-4 text-center">إجراءات</th>
+            <table className="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-300 text-slate-800 font-black">
+                  <th className="p-3">رقم الوصل</th>
+                  <th className="p-3">اسم التلميذ</th>
+                  <th className="p-3">المستوى</th>
+                  <th className="p-3">عن شهر</th>
+                  <th className="p-3">المبلغ المدفوع</th>
+                  <th className="p-3">التاريخ والوقت</th>
+                  <th className="p-3 text-center">خيارات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredPayments.map(p => {
-                  const currentStudent = students.find(s => s.id === p.studentId);
-                  const displayName = currentStudent ? currentStudent.fullName : (p.studentName || 'تلميذ غير محدد');
-
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50 transition">
-                      <td className="p-4 font-bold text-slate-800">{displayName}</td>
-                      <td className="p-4 text-slate-600 font-mono text-xs">{p.month}</td>
-                      <td className="p-4 font-bold text-emerald-600">{p.amount} درهم</td>
-                      <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          p.status === 'مؤدى' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {p.status === 'مؤدى' && (
-                            <button 
-                              onClick={() => handlePrint(p, currentStudent)}
-                              className="px-2 py-1 text-xs rounded bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 transition font-bold cursor-pointer"
-                              title="طباعة الوصل"
-                            >
-                              🖨️ الوصل
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => toggleStatus(p.id, p.status)}
-                            className="px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition font-medium cursor-pointer"
-                          >
-                            تغيير الحالة 🔄
-                          </button>
-                          <button 
-                            onClick={() => confirmDelete(p.id, displayName)}
-                            className="px-2 py-1 text-xs rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition font-bold cursor-pointer"
-                            title="حذف"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-slate-200 font-bold text-slate-900">
+                {payments.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50">
+                    <td className="p-3 font-mono font-black text-blue-800">{p.receiptNo}</td>
+                    <td className="p-3 text-sm">{p.studentName}</td>
+                    <td className="p-3">{p.level}</td>
+                    <td className="p-3 bg-blue-50 text-blue-900 font-black rounded">{p.month}</td>
+                    <td className="p-3 text-emerald-800 font-black text-sm">{p.amount} درهم</td>
+                    <td className="p-3 text-slate-500 text-[11px]">{p.date} - {p.time}</td>
+                    <td className="p-3 text-center flex justify-center gap-2">
+                      <button
+                        onClick={() => setPrintedReceipt(p)}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-black rounded cursor-pointer"
+                      >
+                        🖨️ معاينة الوصل
+                      </button>
+                      <button
+                        onClick={() => sendWhatsAppReceipt(p)}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded cursor-pointer"
+                      >
+                        📲 إرسال بالواتساب
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+        ) : (
+          <p className="text-center font-bold text-slate-500 py-4">لا توجد أداءات مسجلة بعد</p>
         )}
       </div>
 
-      {/* Modal التأكيد قبل الحذف */}
-      {deleteModal.show && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <span className="text-2xl">⚠️</span>
-              <h3 className="text-lg font-bold">تأكيد حذف الأداء</h3>
+      {/* النافذة المنبثقة للطباعة المعززة بـ (الكاشي واللوغو ورسالة الشكر) */}
+      {printedReceipt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg border-2 border-slate-400">
+            
+            {/* أزرار الإعلانات فوق */}
+            <div className="flex justify-between items-center mb-4 print:hidden">
+              <span className="font-black text-slate-800 text-sm">معاينة وصل الأداء الرسمية</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => sendWhatsAppReceipt(printedReceipt)}
+                  className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded hover:bg-emerald-700"
+                >
+                  📲 إرسال للواتساب
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-blue-700 text-white font-black text-xs rounded hover:bg-blue-800"
+                >
+                  🖨️ طباعة الآن
+                </button>
+                <button
+                  onClick={() => setPrintedReceipt(null)}
+                  className="px-3 py-1.5 bg-slate-200 text-slate-800 font-black text-xs rounded hover:bg-slate-300"
+                >
+                  إغلاق ✖
+                </button>
+              </div>
             </div>
-            <p className="text-sm text-slate-600">
-              هل أنت تأكد من رغبتك في حذف سجل الأداء الخاص بالتلميذ(ة) <strong className="text-slate-800">"{deleteModal.studentName}"</strong>؟
-            </p>
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => setDeleteModal({ show: false, id: null, studentName: '' })}
-                disabled={deleting}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={executeDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold transition cursor-pointer disabled:opacity-50"
-              >
-                {deleting ? 'جاري الحذف...' : 'نعم، حذف'}
-              </button>
+
+            {/* بطاقة الوصل المصممة مع اللوغو والكاشي الرسمي */}
+            <div className="relative border-4 border-slate-900 p-6 rounded-lg bg-white text-slate-900 space-y-4 text-right overflow-hidden shadow-inner">
+              
+              {/* الكاشي الإداري المائي والأحمر 🔴 */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-22deg] pointer-events-none opacity-85">
+                <div className="border-4 border-dashed border-red-600 rounded-full w-44 h-44 flex flex-col justify-center items-center text-center p-2 bg-red-50/30">
+                  <span className="text-xs font-black text-red-600 tracking-wider">★ ISSHAAM ACADEMY ★</span>
+                  <span className="text-2xl font-black text-red-600 my-0.5 border-y-2 border-red-600 px-3">PAYÉ</span>
+                  <span className="text-[10px] font-black text-red-600">تم الأداء - مقبوض</span>
+                </div>
+              </div>
+
+              {/* الشعار والرأسية */}
+              <div className="border-b-2 border-slate-900 pb-3 flex justify-between items-center relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-900 text-white rounded-xl flex items-center justify-center font-black text-xl shadow">
+                    🎓
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">ISSHAAM ACADEMY</h2>
+                    <p className="text-[11px] font-bold text-blue-900">مؤسسة الدعم والتقوية والتوجيه</p>
+                  </div>
+                </div>
+                <div className="text-left font-mono text-xs font-black">
+                  <p className="text-blue-900">{printedReceipt.receiptNo}</p>
+                  <p className="text-[10px] text-slate-600">{printedReceipt.date}</p>
+                </div>
+              </div>
+
+              <div className="text-center bg-slate-900 text-white py-1.5 rounded font-black text-xs tracking-wide relative z-10">
+                وصل استلام الواجب الشهري الرسمي — REÇU DE PAIEMENT
+              </div>
+
+              {/* بيانات الوصل التفصيلية */}
+              <div className="space-y-2 text-xs font-bold pt-1 relative z-10">
+                <div className="flex justify-between border-b pb-1 border-slate-200">
+                  <span className="text-slate-600">اسم التلميذ(ة):</span>
+                  <span className="text-slate-900 font-black text-sm">{printedReceipt.studentName}</span>
+                </div>
+
+                <div className="flex justify-between border-b pb-1 border-slate-200">
+                  <span className="text-slate-600">المستوى الدراسي:</span>
+                  <span>{printedReceipt.level}</span>
+                </div>
+
+                <div className="flex justify-between border-b pb-1 border-slate-200">
+                  <span className="text-slate-600">واجب شهر:</span>
+                  <span className="font-black text-blue-900">{printedReceipt.month}</span>
+                </div>
+
+                <div className="flex justify-between border-b pb-1 border-slate-200">
+                  <span className="text-slate-600">المبلغ المستلم:</span>
+                  <span className="font-black text-emerald-800 text-base">{printedReceipt.amount} درهم مغربي</span>
+                </div>
+
+                {printedReceipt.notes && (
+                  <div className="flex justify-between border-b pb-1 border-slate-200">
+                    <span className="text-slate-600">ملاحظات الإدارة:</span>
+                    <span>{printedReceipt.notes}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* عبارات الشكر والتقدير */}
+              <div className="bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 text-center relative z-10">
+                <p className="text-[11px] font-black text-blue-950">🌟 نشكركم على ثقتكم الغالية فـ أكاديمية ISSHAAM. نسأل الله التوفيق والنجاح لأبنائنا الكرام! 🌟</p>
+              </div>
+
+              <div className="pt-4 flex justify-between text-[11px] font-black text-slate-800 relative z-10">
+                <p>توقيع وخاتم الإدارة:</p>
+                <p>توقيع الولي(ة):</p>
+              </div>
+
             </div>
+
           </div>
         </div>
       )}
 
-      {/* نموذج الوصل المخصص للطباعة فقط */}
-      {selectedReceipt && (
-        <div id="printable-receipt" className="hidden p-8 max-w-2xl mx-auto border-2 border-slate-900 bg-white text-slate-900 dir-rtl">
-          {/* هيدر الوصل */}
-          <div className="flex justify-between items-center border-b-2 border-slate-800 pb-4 mb-6">
-            <div>
-              <h1 className="text-2xl font-black tracking-wide text-slate-900">أكاديمية إسهام</h1>
-              <p className="text-sm font-bold text-slate-600 tracking-wider">ISSHAAM ACADEMY</p>
-              <p className="text-xs text-slate-500 mt-1">حي مولاي رشيد - الدار البيضاء</p>
-            </div>
-            <div className="text-left">
-              <span className="text-xs font-bold text-slate-500 block">التاريخ: {selectedReceipt.date}</span>
-              <span className="text-xs font-bold text-slate-500 block">الشهر المستحق: {selectedReceipt.month}</span>
-            </div>
-          </div>
-
-          <div className="text-center my-6">
-            <h2 className="text-xl font-bold uppercase underline tracking-wider border border-slate-800 inline-block px-6 py-1 rounded">
-              وصل أداء واجب التسجيل / REÇU DE PAIEMENT
-            </h2>
-          </div>
-
-          {/* تفاصيل التلميذ والأداء */}
-          <div className="space-y-4 text-base my-8 bg-slate-50 p-4 rounded border border-slate-300">
-            <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="font-bold text-slate-600">اسم التلميذ(ة):</span>
-              <span className="font-black text-slate-900 text-lg">{selectedReceipt.studentName}</span>
-            </div>
-            <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="font-bold text-slate-600">المستوى الدراسي:</span>
-              <span className="font-bold text-slate-800">{selectedReceipt.level}</span>
-            </div>
-            <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="font-bold text-slate-600">المواد المسجل فيها:</span>
-              <span className="font-bold text-slate-800">{selectedReceipt.subjects}</span>
-            </div>
-            <div className="flex justify-between pt-1">
-              <span className="font-bold text-slate-600">المبلغ المستلم:</span>
-              <span className="font-black text-emerald-700 text-xl">{selectedReceipt.amount} درهم</span>
-            </div>
-          </div>
-
-          {/* الكاشي والختم */}
-          <div className="flex justify-between items-end mt-12 pt-6 border-t-2 border-slate-800">
-            {/* طابع الكاشي */}
-            <div className="border-4 border-emerald-600 text-emerald-600 font-black px-6 py-2 rounded-lg transform -rotate-12 tracking-widest text-lg uppercase opacity-90 shadow-sm">
-              Payé / تم الأداء ✅
-            </div>
-
-            {/* التوقيع والختم */}
-            <div className="text-center">
-              <p className="font-bold text-slate-800 mb-10">إدارة الأكاديمية</p>
-              <p className="text-xs text-slate-400">[ التوقيع والختم ]</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
