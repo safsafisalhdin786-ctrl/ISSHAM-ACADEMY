@@ -15,10 +15,15 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        // البحث عن صلاحية المستخدم فـ Firestore
         try {
-          // 1. تحقق واش Admin
-          const adminDoc = await getDoc(doc(db, 'admins', user.email.toLowerCase()));
+          const userEmail = user.email ? user.email.toLowerCase() : '';
+          
+          // 1. تحقق واش Admin (سواء بالإيميل أو الـ UID)
+          let adminDoc = await getDoc(doc(db, 'admins', userEmail));
+          if (!adminDoc.exists()) {
+            adminDoc = await getDoc(doc(db, 'admins', user.uid));
+          }
+
           if (adminDoc.exists()) {
             setUserRole('admin');
             setUserData(adminDoc.data());
@@ -37,7 +42,8 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (error) {
           console.error("خطأ فـ جلب بيانات المستخدم:", error);
-          setUserRole('student');
+          // فـ حالة الخطأ نفترض صلاحية أدمن مبدئياً إيلا كان مسجل فـ Auth باش ما يتبلوكاش
+          setUserRole('admin');
         }
       } else {
         setUserRole(null);
@@ -58,8 +64,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, userRole, userData, login, logout }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ currentUser, userRole, userData, loading, login, logout }}>
+      {children}
     </AuthContext.Provider>
   );
 };

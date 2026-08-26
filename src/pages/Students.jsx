@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   writeBatch 
 } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import StudentProfileModal from '../components/StudentModal';
 
 const AVAILABLE_SUBJECTS = [
@@ -47,6 +48,8 @@ const INITIAL_FORM_STATE = {
 
 export default function Students() {
   const location = useLocation();
+  const { userRole, currentUser } = useAuth ? useAuth() : { userRole: 'admin', currentUser: null };
+  
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +69,7 @@ export default function Students() {
   const [form, setForm] = useState(INITIAL_FORM_STATE);
   const currentDay = new Date().getDate();
 
-  // جلب البيانات
+  // جلب البيانات من Firestore
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -258,6 +261,11 @@ export default function Students() {
   };
 
   const filteredStudents = students.filter(s => {
+    // تصفية حسب الدور إيلا كان أستاذ
+    if (userRole === 'teacher' && currentUser) {
+      if (s.teacherId !== currentUser.uid) return false;
+    }
+
     const matchesArchive = showArchived ? s.archived === true : !s.archived;
     const matchesSearch = s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           s.level?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -313,7 +321,7 @@ export default function Students() {
             className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-48 focus:ring-2 focus:ring-amber-500 text-sm focus:outline-none"
           />
 
-          <select value={selectedLevelFilter} onChange={(e) => setSelectedLevelFilter(e.target.value)} className="px-3 py-2 border rounded-lg text-sm bg-white cursor-pointer">
+          <select value={selectedLevelFilter} onChange={(e) => setSelectedLevelFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
             <option value="">كل المستويات</option>
             <option value="الأول ابتدائي">الأول ابتدائي</option>
             <option value="الثاني ابتدائي">الثاني ابتدائي</option>
@@ -329,12 +337,14 @@ export default function Students() {
             <option value="الثانية باكالوريا">الثانية باكالوريا</option>
           </select>
 
-          <select value={selectedTeacherFilter} onChange={(e) => setSelectedTeacherFilter(e.target.value)} className="px-3 py-2 border rounded-lg text-sm bg-white cursor-pointer">
-            <option value="">كل الأساتذة</option>
-            {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          {userRole === 'admin' && (
+            <select value={selectedTeacherFilter} onChange={(e) => setSelectedTeacherFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
+              <option value="">كل الأساتذة</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
 
-          <button onClick={() => setShowArchived(!showArchived)} className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer transition ${showArchived ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+          <button onClick={() => setShowArchived(!showArchived)} className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer transition ${showArchived ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}>
             {showArchived ? '📂 النشطين' : '📁 الأرشيف'}
           </button>
 
@@ -349,7 +359,7 @@ export default function Students() {
           <button 
             type="button"
             onClick={handleOpenAddForm} 
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition font-semibold text-sm cursor-pointer"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition font-semibold text-sm cursor-pointer shadow-sm"
           >
             {showAddForm ? 'إلغاء' : '+ تسجيل تلميذ'}
           </button>
@@ -359,7 +369,7 @@ export default function Students() {
       {/* Form */}
       {showAddForm && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-amber-200 space-y-4 print:hidden">
-          <div className="flex justify-between items-center border-b pb-2">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 className="text-lg font-bold text-slate-800">{editingId ? 'تعديل بيانات التلميذ' : 'إضافة تلميذ جديد'}</h3>
             <button 
               type="button" 
@@ -476,7 +486,7 @@ export default function Students() {
           </div>
 
           <div className="pt-2 flex items-center gap-3">
-            <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition text-sm disabled:opacity-50 cursor-pointer">
+            <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition text-sm disabled:opacity-50 cursor-pointer shadow-sm">
               {saving ? 'جاري الحفظ...' : (editingId ? 'تحديث البيانات 🔄' : 'حفظ البيانات ✅')}
             </button>
             <button type="button" onClick={() => { setShowAddForm(false); setEditingId(null); }} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 cursor-pointer">
@@ -490,7 +500,7 @@ export default function Students() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
         {loading ? <div className="p-6 text-center text-slate-500 font-bold">جاري التحميل...</div> : (
           <table className="w-full text-right border-collapse min-w-[800px]">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b text-sm">
+            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-sm">
               <tr>
                 <th className="p-4">الاسم الكامل</th>
                 <th className="p-4">المستوى</th>

@@ -14,10 +14,20 @@ import Payments from './pages/Payments';
 import Financials from './pages/Financials';
 import AppSettings from './pages/AppSettings';
 
-// مكوّن لحماية المسارات (يقوم بالتأكد من تسجيل الدخول)
+// مكوّن لحماية المسارات والتأكد من تسجيل الدخول
 function ProtectedLayout({ children }) {
-  const { currentUser } = useAuth ? useAuth() : { currentUser: true };
+  const { currentUser, loading } = useAuth ? useAuth() : { currentUser: true, loading: false };
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // شاشة تحميل أثناء تحقق Firebase من حالة الحساب
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white dir-rtl">
+        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-sm font-semibold text-slate-300">جاري التحقق من بيانات الدخول...</p>
+      </div>
+    );
+  }
 
   // إذا لم يكن هناك مستخدم مسجل، يتم التوجيه لصفحة تسجيل الدخول
   if (!currentUser) {
