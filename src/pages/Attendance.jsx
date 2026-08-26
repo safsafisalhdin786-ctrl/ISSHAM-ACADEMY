@@ -150,12 +150,12 @@ export default function Attendance() {
   return (
     <div className="space-y-6 dir-rtl pb-12 text-right">
       {/* الهيدر وتحديد التاريخ */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl shadow-sm border border-slate-200 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl shadow-md border border-slate-300 gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             تتبع الحضور والغياب 📋
           </h2>
-          <p className="text-sm text-slate-500">تسجيل وتأكيد حضور التلاميذ حسب التاريخ والمستوى</p>
+          <p className="text-sm font-semibold text-slate-600">تسجيل وتأكيد حضور التلاميذ حسب التاريخ والمستوى</p>
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -163,12 +163,12 @@ export default function Attendance() {
             type="date" 
             value={selectedDate} 
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-slate-50 text-slate-700 font-medium text-sm cursor-pointer"
+            className="px-3.5 py-2 border-2 border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white text-slate-900 font-bold text-sm cursor-pointer shadow-sm"
           />
           <button 
             onClick={handleSaveAttendance}
             disabled={saving || filteredStudents.length === 0}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-sm font-bold text-sm disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-md font-extrabold text-sm disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             {saving ? 'جاري الحفظ...' : 'حفظ السجل ✅'}
           </button>
@@ -176,26 +176,26 @@ export default function Attendance() {
       </div>
 
       {saveSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-bold text-center text-sm shadow-sm">
+        <div className="p-4 bg-emerald-100 border-2 border-emerald-400 text-emerald-900 rounded-xl font-extrabold text-center text-sm shadow-sm">
           🎉 تم حفظ سجل الحضور والغياب بنجاح وتحديث قاعدة البيانات!
         </div>
       )}
 
-      {/* شريط الإجراءات السريعة والإحصائيات */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+      {/* شريط الإجراءات السريعة والإحصائيات البارزة */}
+      <div className="bg-white p-4 rounded-xl shadow-md border border-slate-300 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <input 
             type="text" 
             placeholder="🔍 البحث عن تلميذ..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-56 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+            className="px-4 py-2 border-2 border-slate-300 rounded-lg w-full md:w-56 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-900 font-bold text-sm shadow-sm"
           />
 
           <select 
             value={selectedLevelFilter} 
             onChange={(e) => setSelectedLevelFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer"
+            className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-white font-bold text-slate-800 shadow-sm cursor-pointer"
           >
             <option value="">كل المستويات</option>
             <option value="الأول ابتدائي">الأول ابتدائي</option>
@@ -213,72 +213,74 @@ export default function Attendance() {
           </select>
         </div>
 
+        {/* أزرار التحديد السريع بارزة */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500">تحديد سريع:</span>
+          <span className="text-xs font-black text-slate-700">تحديد سريع:</span>
           <button 
             onClick={() => setAllStatus('حاضر')}
-            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black shadow-sm transition cursor-pointer"
           >
             الجميع حاضر ✅
           </button>
           <button 
             onClick={() => setAllStatus('غائب')}
-            className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer"
+            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-sm transition cursor-pointer"
           >
             الجميع غائب ❌
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-bold border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-end">
-          <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
-            حاضر: {presentCount}
+        {/* بطاقات الإحصائيات البارزة جداً */}
+        <div className="flex items-center gap-2 text-xs font-black border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-end">
+          <span className="text-emerald-900 bg-emerald-100 px-3 py-1.5 rounded-lg border-2 border-emerald-300 shadow-sm">
+            حاضر: <strong className="text-sm font-black">{presentCount}</strong>
           </span>
-          <span className="text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-200">
-            غائب: {absentCount}
+          <span className="text-rose-900 bg-rose-100 px-3 py-1.5 rounded-lg border-2 border-rose-300 shadow-sm">
+            غائب: <strong className="text-sm font-black">{absentCount}</strong>
           </span>
-          <span className="text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
-            مبرر: {excusedCount}
+          <span className="text-amber-900 bg-amber-100 px-3 py-1.5 rounded-lg border-2 border-amber-300 shadow-sm">
+            مبرر: <strong className="text-sm font-black">{excusedCount}</strong>
           </span>
         </div>
       </div>
 
       {/* الجدول */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
         {loading ? (
-          <div className="p-6 text-center text-slate-500 font-bold">جاري تحميل قائمة التلاميذ...</div>
+          <div className="p-6 text-center text-slate-700 font-bold">جاري تحميل قائمة التلاميذ...</div>
         ) : filteredStudents.length === 0 ? (
-          <div className="p-6 text-center text-slate-400 font-medium">لا يوجد تلاميذ مطابقون للفلترة الحالية.</div>
+          <div className="p-6 text-center text-slate-500 font-bold">لا يوجد تلاميذ مطابقون للفلترة الحالية.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse min-w-[700px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-sm">
+              <thead className="bg-slate-100 border-b-2 border-slate-300 text-slate-800 font-bold text-sm">
                 <tr>
-                  <th className="px-6 py-3.5">الاسم الكامل</th>
-                  <th className="px-6 py-3.5">المستوى</th>
-                  <th className="px-6 py-3.5">الأستاذ المسؤول</th>
+                  <th className="px-6 py-4">الاسم الكامل</th>
+                  <th className="px-6 py-4">المستوى</th>
+                  <th className="px-6 py-4">الأستاذ المسؤول</th>
                   <th className="px-6 py-3.5 text-center">حالة الحضور اليوم</th>
                   <th className="px-6 py-3.5 text-center">تواصل</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
+              <tbody className="divide-y divide-slate-200 text-sm">
                 {filteredStudents.map(student => {
                   const assignedTeacher = teachers.find(t => t.id === student.teacherId);
                   const status = attendance[student.id] || 'حاضر';
 
                   return (
                     <tr key={student.id} className="hover:bg-slate-50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-800">{student.fullName}</td>
-                      <td className="px-6 py-4 text-slate-600">{student.level || 'غير محدد'}</td>
-                      <td className="px-6 py-4 text-slate-700 font-medium">{assignedTeacher ? assignedTeacher.name : 'عام'}</td>
+                      <td className="px-6 py-4 font-black text-slate-900">{student.fullName}</td>
+                      <td className="px-6 py-4 text-slate-700 font-bold">{student.level || 'غير محدد'}</td>
+                      <td className="px-6 py-4 text-slate-800 font-bold">{assignedTeacher ? assignedTeacher.name : 'عام'}</td>
                       <td className="px-6 py-4 text-center">
-                        <div className="inline-flex rounded-lg p-1 bg-slate-100 gap-1 border border-slate-200">
+                        <div className="inline-flex rounded-lg p-1 bg-slate-200 gap-1 border-2 border-slate-300 shadow-inner">
                           <button
                             type="button"
                             onClick={() => handleStatusChange(student.id, 'حاضر')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'حاضر'
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'text-slate-600 hover:text-slate-900'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'text-slate-700 hover:text-black font-extrabold'
                             }`}
                           >
                             حاضر ✅
@@ -286,10 +288,10 @@ export default function Attendance() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(student.id, 'غائب')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'غائب'
-                                ? 'bg-rose-600 text-white shadow-sm'
-                                : 'text-slate-600 hover:text-slate-900'
+                                ? 'bg-rose-600 text-white shadow-md'
+                                : 'text-slate-700 hover:text-black font-extrabold'
                             }`}
                           >
                             غائب ❌
@@ -297,10 +299,10 @@ export default function Attendance() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(student.id, 'مبرر')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'مبرر'
-                                ? 'bg-amber-500 text-white shadow-sm'
-                                : 'text-slate-600 hover:text-slate-900'
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'text-slate-700 hover:text-black font-extrabold'
                             }`}
                           >
                             مبرر ⚠️
@@ -311,7 +313,7 @@ export default function Attendance() {
                         {status === 'غائب' && (
                           <button
                             onClick={() => sendAbsenceWhatsApp(student)}
-                            className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-md transition cursor-pointer"
                             title="إشعارات الغياب عبر الواتساب"
                           >
                             📲 إشعار الغياب
