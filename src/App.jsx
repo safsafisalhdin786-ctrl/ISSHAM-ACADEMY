@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -14,10 +15,16 @@ import Payments from './pages/Payments';
 import Financials from './pages/Financials';
 import AppSettings from './pages/AppSettings';
 
-// مكوّن لحماية المسارات والتأكد من تسجيل الدخول
+// مكوّن لحماية المسارات وتطبيق إعدادات المظهر واللغة الديناميكية
 function ProtectedLayout({ children }) {
   const { currentUser, loading } = useAuth ? useAuth() : { currentUser: null, loading: false };
+  const { settings } = useSettings ? useSettings() : { settings: {} };
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // جلب لون الخلفية واللغة من الإعدادات
+  const bgColor = settings?.branding?.bgColor || 'bg-slate-50';
+  const language = settings?.branding?.language || 'ar';
+  const isRtl = language !== 'fr';
 
   // التحقق من حالة الدخول محلياً كـ Fallback
   const isLocalAuth = localStorage.getItem('isshaam_auth') === 'true';
@@ -38,14 +45,17 @@ function ProtectedLayout({ children }) {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden text-right" dir="rtl">
-      {/* Sidebar ثابت جهة اليمين */}
+    <div 
+      className={`flex h-screen ${bgColor} overflow-hidden ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      {/* Sidebar ثابت */}
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       
       {/* المساحة الرئيسية المتجاوبة */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header setMobileOpen={setMobileOpen} />
-        <main className="flex-1 overflow-y-auto overflow-x-auto p-4 md:p-6 bg-slate-50">
+        <main className={`flex-1 overflow-y-auto overflow-x-auto p-4 md:p-6 ${bgColor}`}>
           {children}
         </main>
       </div>
@@ -56,32 +66,34 @@ function ProtectedLayout({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          {/* مسار تسجيل الدخول */}
-          <Route path="/login" element={<Login />} />
+      <SettingsProvider>
+        <Router>
+          <Routes>
+            {/* مسار تسجيل الدخول */}
+            <Route path="/login" element={<Login />} />
 
-          {/* المسارات المحمية */}
-          <Route
-            path="/*"
-            element={
-              <ProtectedLayout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/students" element={<Students />} />
-                  <Route path="/attendance" element={<Attendance />} />
-                  <Route path="/teachers" element={<Teachers />} />
-                  <Route path="/payments" element={<Payments />} />
-                  <Route path="/financials" element={<Financials />} />
-                  <Route path="/settings" element={<AppSettings />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </ProtectedLayout>
-            }
-          />
-        </Routes>
-      </Router>
+            {/* المسارات المحمية */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedLayout>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/students" element={<Students />} />
+                    <Route path="/attendance" element={<Attendance />} />
+                    <Route path="/teachers" element={<Teachers />} />
+                    <Route path="/payments" element={<Payments />} />
+                    <Route path="/financials" element={<Financials />} />
+                    <Route path="/settings" element={<AppSettings />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </ProtectedLayout>
+              }
+            />
+          </Routes>
+        </Router>
+      </SettingsProvider>
     </AuthProvider>
   );
 }

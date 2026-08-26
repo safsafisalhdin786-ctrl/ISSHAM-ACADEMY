@@ -1,41 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useSettings } from '../context/SettingsContext';
 
 export default function Sidebar({ mobileOpen, setMobileOpen }) {
-  const [academyInfo, setAcademyInfo] = useState({
-    name: 'أكاديمية إسهام',
-    logoUrl: '/logo.jpg'
-  });
+  const { settings } = useSettings ? useSettings() : { settings: {} };
 
-  // جلب اللوغو واسم الأكاديمية إن وُجِدا في الإعدادات
-  useEffect(() => {
-    const fetchBranding = async () => {
-      try {
-        const docRef = doc(db, 'settings', 'global');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().branding) {
-          const { academyName, logoUrl } = docSnap.data().branding;
-          setAcademyInfo({
-            name: academyName || 'أكاديمية إسهام',
-            logoUrl: logoUrl || '/logo.jpg'
-          });
-        }
-      } catch (err) {
-        console.error('Error fetching sidebar info:', err);
-      }
-    };
-    fetchBranding();
-  }, []);
+  // جلب إعدادات الهوية واللغة واللون من الـ Context المباشر
+  const academyName = settings?.branding?.academyName || 'ISSHAAM ACADEMY';
+  const logoUrl = settings?.branding?.logoUrl || '/logo.jpg';
+  const primaryColor = settings?.branding?.primaryColor || '#f59e0b';
+  const language = settings?.branding?.language || 'ar';
+  const isFr = language === 'fr';
 
+  // عناوين القائمة باللغتين (العربية / الفرنسية)
   const menuItems = [
-    { title: 'لوحة التحكم', path: '/dashboard', icon: '📊' },
-    { title: 'إدارة التلاميذ', path: '/students', icon: '👥' },
-    { title: 'الحضور والغياب', path: '/attendance', icon: '📋' },
-    { title: 'إدارة الأساتذة', path: '/teachers', icon: '👨‍🏫' },
-    { title: 'المالية والأداءات', path: '/payments', icon: '💳' },
-    { title: 'إعدادات النظام', path: '/settings', icon: '⚙️' },
+    { title: isFr ? 'Tableau de bord' : 'لوحة التحكم', path: '/dashboard', icon: '📊' },
+    { title: isFr ? 'Gestion Élèves' : 'إدارة التلاميذ', path: '/students', icon: '👥' },
+    { title: isFr ? 'Présence & Absence' : 'الحضور والغياب', path: '/attendance', icon: '📋' },
+    { title: isFr ? 'Gestion Professeurs' : 'إدارة الأساتذة', path: '/teachers', icon: '👨‍🏫' },
+    { title: isFr ? 'Finances & Reçus' : 'المالية والأداءات', path: '/payments', icon: '💳' },
+    { title: isFr ? 'Rapports Financiers' : 'التقارير المالية', path: '/financials', icon: '📈' },
+    { title: isFr ? 'Paramètres Système' : 'إعدادات النظام', path: '/settings', icon: '⚙️' },
   ];
 
   const handleLinkClick = () => {
@@ -54,22 +39,25 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
       <aside 
         style={{ backgroundColor: '#1a3838', color: '#ffffff' }} 
-        className={`fixed md:static top-0 right-0 z-50 h-screen w-64 p-4 flex flex-col justify-between shadow-xl dir-rtl shrink-0 transition-transform duration-300 ${
+        className={`fixed md:static top-0 right-0 z-50 h-screen w-64 p-4 flex flex-col justify-between shadow-xl shrink-0 transition-transform duration-300 ${
           mobileOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
         }`}
       >
         <div>
-          {/* اللوجو والعنوان */}
+          {/* اللوجو والعنوان الديناميكيين */}
           <div style={{ borderColor: '#2d5555' }} className="flex items-center gap-3 p-3 border-b mb-6">
             <img 
-              src={academyInfo.logoUrl} 
+              src={logoUrl} 
               onError={(e) => { e.target.src = '/logo.jpg'; }}
               alt="Logo" 
-              className="w-12 h-12 object-contain rounded-full bg-white p-1 shadow-md border-2 border-amber-400"
+              className="w-12 h-12 object-contain rounded-full bg-white p-1 shadow-md border-2"
+              style={{ borderColor: primaryColor }}
             />
             <div>
-              <h1 className="font-bold text-base leading-tight text-white">{academyInfo.name}</h1>
-              <span className="text-xs text-emerald-300">نظام الإدارة المدرسية</span>
+              <h1 className="font-bold text-base leading-tight text-white">{academyName}</h1>
+              <span className="text-xs text-emerald-300">
+                {isFr ? 'Système de Gestion' : 'نظام الإدارة المدرسية'}
+              </span>
             </div>
           </div>
 
@@ -81,7 +69,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                 to={item.path}
                 onClick={handleLinkClick}
                 style={({ isActive }) => ({
-                  backgroundColor: isActive ? '#f59e0b' : 'transparent',
+                  backgroundColor: isActive ? primaryColor : 'transparent',
                   color: isActive ? '#0f172a' : '#e2e8f0',
                 })}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl transition duration-200 text-sm font-bold"
@@ -93,9 +81,9 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
           </nav>
         </div>
 
-        {/* الهادر التحتاني */}
+        {/* الهيدر التحتاني */}
         <div style={{ backgroundColor: '#132c2c', borderColor: '#254d4d' }} className="p-3 rounded-xl border text-xs text-center space-y-1">
-          <p className="text-slate-200 font-medium">ISSHAAM ACADEMY</p>
+          <p className="text-slate-200 font-medium">{academyName}</p>
           <p className="text-slate-400">الإصدار 1.0.0</p>
         </div>
       </aside>
