@@ -152,14 +152,14 @@ export default function Teachers() {
   });
 
   return (
-    <div className="space-y-6 dir-rtl text-right max-w-full pb-12">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-100 p-4 md:p-6 space-y-6 dir-rtl text-right max-w-full pb-12">
+      {/* Header Card */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl shadow-sm border border-slate-200 gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             إدارة الأساتذة 👨‍🏫
           </h2>
-          <p className="text-sm text-slate-500">إضافة وتتبع الطاقم التربوي لأكاديمية إسهام</p>
+          <p className="text-sm text-slate-500 mt-1">إضافة وتتبع الطاقم التربوي لأكاديمية إسهام</p>
         </div>
         
         {/* زر إضافة أستاذ جديد بارز */}
@@ -171,7 +171,7 @@ export default function Teachers() {
           }}
           className={`px-5 py-2.5 text-white rounded-lg transition font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer ${
             showAddForm 
-              ? 'bg-slate-600 hover:bg-slate-700' 
+              ? 'bg-slate-700 hover:bg-slate-800' 
               : 'bg-amber-500 hover:bg-amber-600'
           }`}
         >
@@ -180,10 +180,10 @@ export default function Teachers() {
         </button>
       </div>
 
-      {/* Form */}
+      {/* Form Card */}
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border-2 border-amber-200 space-y-4 transition-all">
-          <div className="flex justify-between items-center border-b pb-3">
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border-2 border-amber-300 space-y-4 transition-all">
+          <div className="flex justify-between items-center border-b border-slate-200 pb-3">
             <h3 className="text-md font-bold text-slate-800 flex items-center gap-2">
               <span>{editingId ? '✏️' : '➕'}</span>
               {editingId ? 'تعديل بيانات الأستاذ' : 'إضافة أستاذ جديد'}
@@ -199,7 +199,7 @@ export default function Teachers() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <label className="block text-slate-700 font-medium mb-1">الاسم الكامل *</label>
+              <label className="block text-slate-700 font-bold mb-1">الاسم الكامل *</label>
               <input 
                 type="text" 
                 value={form.fullName} 
@@ -210,7 +210,7 @@ export default function Teachers() {
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-medium mb-1">المادة المدرسة</label>
+              <label className="block text-slate-700 font-bold mb-1">المادة المدرسة</label>
               <select 
                 value={form.subject} 
                 onChange={e => setForm({ ...form, subject: e.target.value })} 
@@ -222,7 +222,7 @@ export default function Teachers() {
               </select>
             </div>
             <div>
-              <label className="block text-slate-700 font-medium mb-1">رقم الهاتف *</label>
+              <label className="block text-slate-700 font-bold mb-1">رقم الهاتف *</label>
               <input 
                 type="text" 
                 value={form.phone} 
@@ -233,7 +233,7 @@ export default function Teachers() {
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-medium mb-1">المستحقات الشهريّة (درهم)</label>
+              <label className="block text-slate-700 font-bold mb-1">المستحقات الشهريّة (درهم)</label>
               <input 
                 type="number" 
                 value={form.salary} 
@@ -243,7 +243,7 @@ export default function Teachers() {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-3 border-t">
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button 
               type="button"
               onClick={() => setShowAddForm(false)}
@@ -285,22 +285,22 @@ export default function Teachers() {
           </select>
         </div>
 
-        <div className="text-xs font-bold text-slate-500">
-          إجمالي الأساتذة: <span className="text-amber-600 font-bold text-sm">{filteredTeachers.length}</span>
+        <div className="text-xs font-bold text-slate-600">
+          إجمالي الأساتذة: <span className="text-amber-600 font-bold text-sm bg-amber-50 px-2 py-1 rounded-md border border-amber-200">{filteredTeachers.length}</span>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-6 text-center text-slate-500 font-bold">جاري تحميل لائحة الأساتذة...</div>
+          <div className="p-8 text-center text-slate-500 font-bold">جاري تحميل لائحة الأساتذة...</div>
         ) : filteredTeachers.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 space-y-3">
-            <p className="text-base font-medium">لا يوجد أساتذة مطابقون للبحث.</p>
+          <div className="p-10 text-center text-slate-500 space-y-3">
+            <p className="text-base font-bold text-slate-700">لا يوجد أساتذة مطابقون للبحث.</p>
             {!showAddForm && (
               <button 
                 onClick={() => setShowAddForm(true)}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-sm"
               >
                 + إضافة أستاذ الآن
               </button>
@@ -309,7 +309,7 @@ export default function Teachers() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse min-w-[650px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 font-bold">
+              <thead className="bg-slate-100 border-b border-slate-200 text-xs text-slate-700 font-bold">
                 <tr>
                   <th className="p-4">الاسم الكامل</th>
                   <th className="p-4">المادة</th>
@@ -321,19 +321,19 @@ export default function Teachers() {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredTeachers.map(teacher => (
                   <tr key={teacher.id} className="hover:bg-slate-50 transition">
-                    <td className="p-4 font-bold text-slate-800">{teacher.displayName}</td>
+                    <td className="p-4 font-bold text-slate-900">{teacher.displayName}</td>
                     <td className="p-4">
-                      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-100">
+                      <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-md text-xs font-semibold border border-amber-200">
                         {teacher.subject || 'غير محدد'}
                       </span>
                     </td>
                     <td className="p-4 font-mono text-xs" dir="ltr">
                       <div className="flex items-center gap-2 justify-end">
-                        <span>{teacher.phone || '---'}</span>
+                        <span className="font-semibold text-slate-800">{teacher.phone || '---'}</span>
                         {teacher.phone && (
                           <button
                             onClick={() => openWhatsApp(teacher.phone)}
-                            className="text-emerald-600 hover:text-emerald-700 cursor-pointer"
+                            className="text-emerald-600 hover:text-emerald-700 text-base cursor-pointer"
                             title="تواصل عبر الواتساب"
                           >
                             💬
@@ -341,20 +341,20 @@ export default function Teachers() {
                         )}
                       </div>
                     </td>
-                    <td className="p-4 font-semibold text-slate-700">
+                    <td className="p-4 font-semibold text-slate-800">
                       {teacher.salary ? `${teacher.salary} درهم` : '---'}
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button 
                           onClick={() => handleEdit(teacher)} 
-                          className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 rounded text-xs font-bold transition cursor-pointer"
+                          className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded text-xs font-bold transition cursor-pointer"
                         >
                           ✏️ تعديل
                         </button>
                         <button 
                           onClick={() => confirmDelete(teacher.id, teacher.displayName)} 
-                          className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 rounded text-xs font-bold transition cursor-pointer"
+                          className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 rounded text-xs font-bold transition cursor-pointer"
                         >
                           🗑️ حذف
                         </button>
