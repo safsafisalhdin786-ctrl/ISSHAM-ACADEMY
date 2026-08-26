@@ -16,8 +16,11 @@ import AppSettings from './pages/AppSettings';
 
 // مكوّن لحماية المسارات والتأكد من تسجيل الدخول
 function ProtectedLayout({ children }) {
-  const { currentUser, loading } = useAuth ? useAuth() : { currentUser: true, loading: false };
+  const { currentUser, loading } = useAuth ? useAuth() : { currentUser: null, loading: false };
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // التحقق من حالة الدخول محلياً كـ Fallback
+  const isLocalAuth = localStorage.getItem('isshaam_auth') === 'true';
 
   // شاشة تحميل أثناء تحقق Firebase من حالة الحساب
   if (loading) {
@@ -29,8 +32,8 @@ function ProtectedLayout({ children }) {
     );
   }
 
-  // إذا لم يكن هناك مستخدم مسجل، يتم التوجيه لصفحة تسجيل الدخول
-  if (!currentUser) {
+  // السماح بالدخول إذا كان هناك حساب Firebase أو توثيق محلي في localStorage
+  if (!currentUser && !isLocalAuth) {
     return <Navigate to="/login" replace />;
   }
 

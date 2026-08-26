@@ -3,15 +3,19 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { currentUser, userRole } = useAuth();
+  const { currentUser, userRole } = useAuth ? useAuth() : { currentUser: null, userRole: 'admin' };
 
-  // 1. إلا كان المستخدم ما مسجلش الدخول بالمرة
-  if (!currentUser) {
+  // التحقق من وجود توثيق محلي كـ Fallback
+  const isLocalAuth = localStorage.getItem('isshaam_auth') === 'true';
+  const effectiveRole = userRole || (isLocalAuth ? 'admin' : null);
+
+  // 1. إذا لم يكن المستخدم مسجلاً الدخول (لا عبر Firebase ولا عبر localStorage)
+  if (!currentUser && !isLocalAuth) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. إلا كان مسموح برتب معينة، والمستخدم ما عندوش ديك الرتبة
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
+  // 2. إذا كانت هناك رتب محددة، والمستخدم لا يملك إحداها
+  if (allowedRoles && !allowedRoles.includes(effectiveRole)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] dir-rtl text-center p-6">
         <h1 className="text-4xl font-extrabold text-red-600 mb-3">403 - وصول غير مصرح</h1>
@@ -22,6 +26,6 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
-  // 3. كلشي هو هذاك، عرض الصفحة
+  // 3. كل شيء ممتاز، عرض المحتوى
   return children;
 }
