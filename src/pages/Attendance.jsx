@@ -29,7 +29,6 @@ export default function Attendance() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // جلب التلاميذ غير المؤرشفين والأساتذة
       const [studentsSnap, teachersSnap, attendanceSnap] = await Promise.all([
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'teachers')),
@@ -43,14 +42,12 @@ export default function Attendance() {
       setStudents(activeStudents);
       setTeachers(teachersSnap.docs.map(d => ({ id: d.id, ...d.data(), name: d.data().fullName || d.data().name || '' })));
 
-      // خريطة الحضور للترخيص السريع
       const initialAttendance = {};
       attendanceSnap.forEach(docSnap => {
         const data = docSnap.data();
         initialAttendance[data.studentId] = data.status;
       });
 
-      // افتراضياً: حاضرا إذا لم يسجل مسبقاً
       const updatedAttendance = {};
       activeStudents.forEach(student => {
         updatedAttendance[student.id] = initialAttendance[student.id] || 'حاضر';
@@ -68,7 +65,6 @@ export default function Attendance() {
     fetchData();
   }, [fetchData]);
 
-  // تغيير حالة تلميذ معين
   const handleStatusChange = (studentId, status) => {
     setAttendance(prev => ({
       ...prev,
@@ -76,7 +72,6 @@ export default function Attendance() {
     }));
   };
 
-  // تصفية التلاميذ حسب الصلاحيات والبحث والمستوى
   const filteredStudents = students.filter(s => {
     if (userRole === 'teacher' && currentUser) {
       if (s.teacherId !== currentUser.uid) return false;
@@ -89,7 +84,6 @@ export default function Attendance() {
     return matchesSearch && matchesLevel;
   });
 
-  // تحديد الحالة للجميع فـ القائمة المعروضة
   const setAllStatus = (status) => {
     const updated = { ...attendance };
     filteredStudents.forEach(s => {
@@ -98,7 +92,6 @@ export default function Attendance() {
     setAttendance(updated);
   };
 
-  // حفظ سجلات الحضور فـ Firestore باستخدام Batch Processing
   const handleSaveAttendance = async () => {
     if (filteredStudents.length === 0) return;
     setSaving(true);
@@ -131,7 +124,6 @@ export default function Attendance() {
     }
   };
 
-  // إرسال تنبيه الغياب لولي الأمر عبر الواتساب
   const sendAbsenceWhatsApp = (student) => {
     if (!student.parentPhone) return alert('رقم هاتف الولي غير متوفر!');
     let clean = student.parentPhone.trim().replace(/\s+/g, '').replace(/-/g, '');
@@ -142,14 +134,13 @@ export default function Attendance() {
     window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // الإحصائيات الخاصة بالقائمة المفلترة
   const presentCount = filteredStudents.filter(s => attendance[s.id] === 'حاضر').length;
   const absentCount = filteredStudents.filter(s => attendance[s.id] === 'غائب').length;
   const excusedCount = filteredStudents.filter(s => attendance[s.id] === 'مبرر').length;
 
   return (
     <div className="space-y-6 dir-rtl pb-12 text-right">
-      {/* الهيدر وتحديد التاريخ */}
+      {/* الترويسة وتحديد التاريخ */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl shadow-md border border-slate-300 gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
@@ -168,7 +159,7 @@ export default function Attendance() {
           <button 
             onClick={handleSaveAttendance}
             disabled={saving || filteredStudents.length === 0}
-            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-md font-extrabold text-sm disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-md transition text-sm disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             {saving ? 'جاري الحفظ...' : 'حفظ السجل ✅'}
           </button>
@@ -181,7 +172,7 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* شريط الإجراءات السريعة والإحصائيات البارزة */}
+      {/* شريط الإجراءات والإحصائيات */}
       <div className="bg-white p-4 rounded-xl shadow-md border border-slate-300 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <input 
@@ -189,7 +180,7 @@ export default function Attendance() {
             placeholder="🔍 البحث عن تلميذ..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border-2 border-slate-300 rounded-lg w-full md:w-56 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-900 font-bold text-sm shadow-sm"
+            className="px-4 py-2 border-2 border-slate-300 rounded-lg w-full md:w-56 focus:ring-2 focus:ring-blue-600 text-slate-900 font-bold text-sm shadow-sm"
           />
 
           <select 
@@ -213,24 +204,24 @@ export default function Attendance() {
           </select>
         </div>
 
-        {/* أزرار التحديد السريع بارزة */}
+        {/* أزرار التحديد السريع */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-black text-slate-700">تحديد سريع:</span>
+          <span className="text-xs font-black text-slate-800">تحديد سريع:</span>
           <button 
             onClick={() => setAllStatus('حاضر')}
-            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black shadow-sm transition cursor-pointer"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black shadow-md transition cursor-pointer"
           >
             الجميع حاضر ✅
           </button>
           <button 
             onClick={() => setAllStatus('غائب')}
-            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-sm transition cursor-pointer"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-md transition cursor-pointer"
           >
             الجميع غائب ❌
           </button>
         </div>
 
-        {/* بطاقات الإحصائيات البارزة جداً */}
+        {/* بطاقات الإحصائيات */}
         <div className="flex items-center gap-2 text-xs font-black border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-end">
           <span className="text-emerald-900 bg-emerald-100 px-3 py-1.5 rounded-lg border-2 border-emerald-300 shadow-sm">
             حاضر: <strong className="text-sm font-black">{presentCount}</strong>
@@ -273,14 +264,14 @@ export default function Attendance() {
                       <td className="px-6 py-4 text-slate-700 font-bold">{student.level || 'غير محدد'}</td>
                       <td className="px-6 py-4 text-slate-800 font-bold">{assignedTeacher ? assignedTeacher.name : 'عام'}</td>
                       <td className="px-6 py-4 text-center">
-                        <div className="inline-flex rounded-lg p-1 bg-slate-200 gap-1 border-2 border-slate-300 shadow-inner">
+                        <div className="inline-flex rounded-lg p-1 bg-slate-200 gap-1 border border-slate-300">
                           <button
                             type="button"
                             onClick={() => handleStatusChange(student.id, 'حاضر')}
                             className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'حاضر'
                                 ? 'bg-emerald-600 text-white shadow-md'
-                                : 'text-slate-700 hover:text-black font-extrabold'
+                                : 'bg-slate-100 text-slate-800 hover:bg-slate-300'
                             }`}
                           >
                             حاضر ✅
@@ -291,7 +282,7 @@ export default function Attendance() {
                             className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'غائب'
                                 ? 'bg-rose-600 text-white shadow-md'
-                                : 'text-slate-700 hover:text-black font-extrabold'
+                                : 'bg-slate-100 text-slate-800 hover:bg-slate-300'
                             }`}
                           >
                             غائب ❌
@@ -302,7 +293,7 @@ export default function Attendance() {
                             className={`px-3 py-1.5 rounded-md text-xs font-black transition cursor-pointer ${
                               status === 'مبرر'
                                 ? 'bg-amber-600 text-white shadow-md'
-                                : 'text-slate-700 hover:text-black font-extrabold'
+                                : 'bg-slate-100 text-slate-800 hover:bg-slate-300'
                             }`}
                           >
                             مبرر ⚠️
