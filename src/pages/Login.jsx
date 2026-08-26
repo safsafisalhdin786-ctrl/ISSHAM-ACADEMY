@@ -26,32 +26,32 @@ export default function Login() {
 
     const cleanEmail = email.trim().toLowerCase();
 
+    // 1. التحقق المباشر من الحساب الافتراضي للتمرير الفوري دون انتظار Firebase
     if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
       handleLoginSuccess();
       setLoading(false);
       return;
     }
 
+    // 2. المحاولة عبر Firebase للحسابات الأخرى
     try {
       await signInWithEmailAndPassword(auth, cleanEmail, password);
       handleLoginSuccess();
     } catch (err) {
       console.error('Login error:', err);
       
-      if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
-          handleLoginSuccess();
-          return;
-        }
+      // التمرير في حال تطابق البيانات الافتراضية مع وجود أي خطأ في Firebase
+      if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
+        handleLoginSuccess();
+        return;
+      }
+
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('البريد الإلكتروني أو كلمة السر غير صحيحة.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('تم حظر المحاولات مؤقتاً بسبب كثرة الأخطاء. حاول لاحقاً.');
       } else {
-        if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
-          handleLoginSuccess();
-          return;
-        }
-        setError('حدث خطأ أثناء تسجيل الدخول. يمكنك استخدام بيانات الدخول الافتراضية.');
+        setError('حدث خطأ أثناء تسجيل الدخول. يمكنك استخدام زر الدخول السريع.');
       }
     } finally {
       setLoading(false);
@@ -129,6 +129,7 @@ export default function Login() {
 
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <button
+            type="button"
             onClick={handleQuickLogin}
             className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg transition border border-slate-300 w-full cursor-pointer"
           >
