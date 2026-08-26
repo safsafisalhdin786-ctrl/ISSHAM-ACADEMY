@@ -24,7 +24,8 @@ const SUBJECTS_LIST = [
 ];
 
 export default function Teachers() {
-  const { userRole } = useAuth ? useAuth() : { userRole: 'admin' };
+  const auth = useAuth ? useAuth() : null;
+  const userRole = auth?.userRole || 'admin';
 
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -160,36 +161,52 @@ export default function Teachers() {
           </h2>
           <p className="text-sm text-slate-500">إضافة وتتبع الطاقم التربوي لأكاديمية إسهام</p>
         </div>
-        {userRole === 'admin' && (
-          <button 
-            onClick={() => {
-              setShowAddForm(!showAddForm);
-              setEditingId(null);
-              setForm({ fullName: '', subject: 'الرياضيات', phone: '', salary: '' });
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-bold text-sm shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            {showAddForm ? 'إلغاء' : '+ إضافة أستاذ'}
-          </button>
-        )}
+        
+        {/* زر إضافة أستاذ جديد بارز */}
+        <button 
+          onClick={() => {
+            setShowAddForm(!showAddForm);
+            setEditingId(null);
+            setForm({ fullName: '', subject: 'الرياضيات', phone: '', salary: '' });
+          }}
+          className={`px-5 py-2.5 text-white rounded-lg transition font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer ${
+            showAddForm 
+              ? 'bg-slate-600 hover:bg-slate-700' 
+              : 'bg-amber-500 hover:bg-amber-600'
+          }`}
+        >
+          <span>{showAddForm ? '✕' : '+'}</span>
+          <span>{showAddForm ? 'إلغاء النافذة' : 'إضافة أستاذ جديد'}</span>
+        </button>
       </div>
 
       {/* Form */}
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-indigo-100 space-y-4">
-          <h3 className="text-md font-bold text-slate-800 border-b pb-2">
-            {editingId ? 'تعديل بيانات الأستاذ' : 'بيانات الأستاذ الجديد'}
-          </h3>
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border-2 border-amber-200 space-y-4 transition-all">
+          <div className="flex justify-between items-center border-b pb-3">
+            <h3 className="text-md font-bold text-slate-800 flex items-center gap-2">
+              <span>{editingId ? '✏️' : '➕'}</span>
+              {editingId ? 'تعديل بيانات الأستاذ' : 'إضافة أستاذ جديد'}
+            </h3>
+            <button 
+              type="button" 
+              onClick={() => setShowAddForm(false)}
+              className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+            >
+              إغلاق ✕
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <label className="block text-slate-700 font-medium mb-1">الاسم الكامل</label>
+              <label className="block text-slate-700 font-medium mb-1">الاسم الكامل *</label>
               <input 
                 type="text" 
                 value={form.fullName} 
                 onChange={e => setForm({ ...form, fullName: e.target.value })} 
                 required 
                 placeholder="مثال: أستاذ عبد الله"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
               />
             </div>
             <div>
@@ -197,7 +214,7 @@ export default function Teachers() {
               <select 
                 value={form.subject} 
                 onChange={e => setForm({ ...form, subject: e.target.value })} 
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
               >
                 {SUBJECTS_LIST.map(sub => (
                   <option key={sub} value={sub}>{sub}</option>
@@ -205,14 +222,14 @@ export default function Teachers() {
               </select>
             </div>
             <div>
-              <label className="block text-slate-700 font-medium mb-1">رقم الهاتف</label>
+              <label className="block text-slate-700 font-medium mb-1">رقم الهاتف *</label>
               <input 
                 type="text" 
                 value={form.phone} 
                 onChange={e => setForm({ ...form, phone: e.target.value })} 
                 required 
                 placeholder="06XXXXXXXX"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
               />
             </div>
             <div>
@@ -222,15 +239,22 @@ export default function Teachers() {
                 value={form.salary} 
                 onChange={e => setForm({ ...form, salary: e.target.value })} 
                 placeholder="مثال: 1500"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-3 border-t">
+            <button 
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition cursor-pointer"
+            >
+              إلغاء
+            </button>
             <button 
               type="submit" 
               disabled={saving} 
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? 'جاري الحفظ...' : 'حفظ البيانات ✅'}
             </button>
@@ -246,7 +270,7 @@ export default function Teachers() {
             placeholder="🔍 البحث باسم الأستاذ أو الهاتف..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+            className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
           />
 
           <select 
@@ -262,7 +286,7 @@ export default function Teachers() {
         </div>
 
         <div className="text-xs font-bold text-slate-500">
-          إجمالي الأساتذة: <span className="text-indigo-600">{filteredTeachers.length}</span>
+          إجمالي الأساتذة: <span className="text-amber-600 font-bold text-sm">{filteredTeachers.length}</span>
         </div>
       </div>
 
@@ -271,7 +295,17 @@ export default function Teachers() {
         {loading ? (
           <div className="p-6 text-center text-slate-500 font-bold">جاري تحميل لائحة الأساتذة...</div>
         ) : filteredTeachers.length === 0 ? (
-          <div className="p-6 text-center text-slate-400">لا يوجد أساتذة مطابقون للبحث.</div>
+          <div className="p-8 text-center text-slate-400 space-y-3">
+            <p className="text-base font-medium">لا يوجد أساتذة مطابقون للبحث.</p>
+            {!showAddForm && (
+              <button 
+                onClick={() => setShowAddForm(true)}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition"
+              >
+                + إضافة أستاذ الآن
+              </button>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse min-w-[650px]">
@@ -289,12 +323,12 @@ export default function Teachers() {
                   <tr key={teacher.id} className="hover:bg-slate-50 transition">
                     <td className="p-4 font-bold text-slate-800">{teacher.displayName}</td>
                     <td className="p-4">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-semibold border border-indigo-100">
+                      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-100">
                         {teacher.subject || 'غير محدد'}
                       </span>
                     </td>
                     <td className="p-4 font-mono text-xs" dir="ltr">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 justify-end">
                         <span>{teacher.phone || '---'}</span>
                         {teacher.phone && (
                           <button
@@ -318,14 +352,12 @@ export default function Teachers() {
                         >
                           ✏️ تعديل
                         </button>
-                        {userRole === 'admin' && (
-                          <button 
-                            onClick={() => confirmDelete(teacher.id, teacher.displayName)} 
-                            className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 rounded text-xs font-bold transition cursor-pointer"
-                          >
-                            🗑️ حذف
-                          </button>
-                        )}
+                        <button 
+                          onClick={() => confirmDelete(teacher.id, teacher.displayName)} 
+                          className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 rounded text-xs font-bold transition cursor-pointer"
+                        >
+                          🗑️ حذف
+                        </button>
                       </div>
                     </td>
                   </tr>
