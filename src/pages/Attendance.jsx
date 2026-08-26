@@ -11,16 +11,16 @@ export default function Attendance() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // جلب قائمة التلاميذ وتفريغ حالة الحضور
+  // جلب قائمة التلاميذ غير المؤرشفين وتفريغ حالة الحضور
   const fetchData = async () => {
     setLoading(true);
     try {
       const studentsSnap = await getDocs(collection(db, 'students'));
-      const studentsList = studentsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setStudents(studentsList);
+      const activeStudents = studentsSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(student => !student.archived);
+      
+      setStudents(activeStudents);
 
       // جلب الحضور المسجل مسبقاً لهذا التاريخ إن وجد
       const attendanceSnap = await getDocs(collection(db, 'attendance'));
@@ -35,7 +35,7 @@ export default function Attendance() {
 
       // إعطاء حالة "حاضر" كخيار افتراضي للجميع إذا لم تسجل بعد
       const updatedAttendance = {};
-      studentsList.forEach(student => {
+      activeStudents.forEach(student => {
         updatedAttendance[student.id] = initialAttendance[student.id] || 'حاضر';
       });
 
@@ -51,7 +51,7 @@ export default function Attendance() {
     fetchData();
   }, [selectedDate]);
 
-  // تغيير حالة تلميذ معين (حاضر / غائب)
+  // تغيير حالة تلميذ معين (حاضر / غائب / مبرر)
   const handleStatusChange = (studentId, status) => {
     setAttendance(prev => ({
       ...prev,
@@ -59,10 +59,16 @@ export default function Attendance() {
     }));
   };
 
-  // تحديد الجميع بحالة واحدة (حاضر أو غائب)
+  // تصفية القائمة بناءً على البحث
+  const filteredStudents = students.filter(s => 
+    s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.level?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // تحديد المعروضين بحالة واحدة (حاضر أو غائب)
   const setAllStatus = (status) => {
-    const updated = {};
-    students.forEach(s => {
+    const updated = { ...attendance };
+    filteredStudents.forEach(s => {
       updated[s.id] = status;
     });
     setAttendance(updated);
@@ -94,13 +100,9 @@ export default function Attendance() {
     }
   };
 
-  const filteredStudents = students.filter(s => 
-    s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.level?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const presentCount = Object.values(attendance).filter(v => v === 'حاضر').length;
   const absentCount = Object.values(attendance).filter(v => v === 'غائب').length;
+  const excusedCount = Object.values(attendance).filter(v => v === 'مبرر').length;
 
   return (
     <div className="space-y-6 dir-rtl pb-12">
@@ -120,7 +122,7 @@ export default function Attendance() {
           <button 
             onClick={handleSaveAttendance}
             disabled={saving || students.length === 0}
-            className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm font-medium text-sm disabled:opacity-50 whitespace-nowrap"
+            className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm font-medium text-sm disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             {saving ? 'جاري الحفظ...' : 'حفظ السجل ✅'}
           </button>
@@ -138,35 +140,38 @@ export default function Attendance() {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <input 
             type="text" 
-            placeholder="🔍 البحث عن تلميذ..." 
+            placeholder="🔍 البحث عن تلميذ أو مستوى..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="px-4 py-2 border border-slate-300 rounded-lg w-full md:w-64 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-500">تحديد سريع:</span>
           <button 
             onClick={() => setAllStatus('حاضر')}
-            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition"
+            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
           >
             الجميع حاضر ✅
           </button>
           <button 
             onClick={() => setAllStatus('غائب')}
-            className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition"
+            className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer"
           >
             الجميع غائب ❌
           </button>
         </div>
 
-        <div className="flex items-center gap-4 text-xs font-bold border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-end">
-          <span className="text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
-            الحاضرون: {presentCount}
+        <div className="flex items-center gap-2 text-xs font-bold border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-end">
+          <span className="text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+            حاضر: {presentCount}
           </span>
-          <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
-            الغائبون: {absentCount}
+          <span className="text-rose-600 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100">
+            غائب: {absentCount}
+          </span>
+          <span className="text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100">
+            مبرر: {excusedCount}
           </span>
         </div>
       </div>
@@ -191,13 +196,13 @@ export default function Attendance() {
                 {filteredStudents.map(student => (
                   <tr key={student.id} className="hover:bg-slate-50 transition">
                     <td className="px-6 py-4 font-medium text-slate-800">{student.fullName}</td>
-                    <td className="px-6 py-4 text-slate-600">{student.level}</td>
+                    <td className="px-6 py-4 text-slate-600">{student.level || 'غير محدد'}</td>
                     <td className="px-6 py-4 text-center">
                       <div className="inline-flex rounded-lg p-1 bg-slate-100 gap-1">
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'حاضر')}
-                          className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
                             attendance[student.id] === 'حاضر'
                               ? 'bg-emerald-600 text-white shadow-sm'
                               : 'text-slate-600 hover:text-slate-900'
@@ -208,13 +213,24 @@ export default function Attendance() {
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'غائب')}
-                          className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
                             attendance[student.id] === 'غائب'
                               ? 'bg-rose-600 text-white shadow-sm'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
                           غائب ❌
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(student.id, 'مبرر')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
+                            attendance[student.id] === 'مبرر'
+                              ? 'bg-amber-500 text-white shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          مبرر ⚠️
                         </button>
                       </div>
                     </td>

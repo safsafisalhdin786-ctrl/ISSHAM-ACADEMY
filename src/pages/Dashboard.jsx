@@ -15,6 +15,21 @@ export default function Dashboard() {
   const [recentStudents, setRecentStudents] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // تتبع حالة الاتصال بالإنترنت
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -24,47 +39,74 @@ export default function Dashboard() {
         const pSnap = await getDocs(collection(db, 'payments'));
         const aSnap = await getDocs(collection(db, 'attendance'));
 
+        // تصفية التلاميذ غير المؤرشفين فقط
+        const activeStudents = sSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(s => !s.archived);
+
         const todayStr = new Date().toISOString().split('T')[0];
         let presentCount = 0;
-        aSnap.forEach(d => { if(d.data().date === todayStr && d.data().status === 'حاضر') presentCount++; });
+        aSnap.forEach(d => {
+          const data = d.data();
+          if (data.date === todayStr && data.status === 'حاضر') presentCount++;
+        });
 
         let incomeSum = 0;
         let pendingSum = 0;
         const pList = [];
+
         pSnap.forEach(d => {
-          const data = d.data();
-          pList.push(data);
-          if(data.status === 'مؤدى' || data.status === 'paid') incomeSum += Number(data.amount || 0);
-          else pendingSum += Number(data.amount || 0);
+          const data = { id: d.id, ...d.data() };
+          if (!data.archived) {
+            pList.push(data);
+            if (data.status === 'مؤدى' || data.status === 'paid') {
+              incomeSum += Number(data.amount || 0);
+            } else {
+              pendingSum += Number(data.amount || 0);
+            }
+          }
         });
 
-        const sList = sSnap.docs.map(d => d.data());
-
         setStats({
-          studentsCount: sSnap.size,
+          studentsCount: activeStudents.length,
           teachersCount: tSnap.size,
           presentToday: presentCount,
           monthlyIncome: incomeSum,
           pendingPayments: pendingSum
         });
 
-        setRecentStudents(sList.slice(-5).reverse());
+        // جلب أحدث 5 تلاميذ وأحدث 5 مدفوعات
+        setRecentStudents(activeStudents.slice(-5).reverse());
         setRecentPayments(pList.slice(-5).reverse());
-      } catch(err) { console.error(err); }
-      finally { setLoading(false); }
+      } catch (err) {
+        console.error("خطأ أثناء جلب البيانات:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchAll();
   }, []);
 
-  if(loading) return <div className="p-6 text-center text-slate-500 font-bold">جاري تحميل لوحة التحكم...</div>;
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-slate-500 font-bold">
+        جاري تحميل لوحة التحكم...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 dir-rtl pb-10">
-      {/* Welcome Bar */}
+      {/* Welcome Bar & Connection Status */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">مرحباً بك 👋</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-slate-800">مرحباً بك 👋</h2>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${isOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+              {isOnline ? '🌐 أونلاين' : '📡 أوفلاين (بدون إنترنت)'}
+            </span>
+          </div>
           <p className="text-sm text-slate-500 mt-1">إليك نظرة عامة على أداء ومداخيل المركز هذا الشهر</p>
         </div>
         <div className="bg-amber-50 text-amber-700 font-bold px-4 py-2 rounded-lg text-sm border border-amber-200 shadow-sm">
@@ -74,13 +116,22 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => navigate('/students')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+        <button 
+          onClick={() => navigate('/students', { state: { openAddModal: true } })} 
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+        >
           ➕ إضافة / إدارة التلاميذ
         </button>
-        <button onClick={() => navigate('/attendance')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+        <button 
+          onClick={() => navigate('/attendance')} 
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+        >
           ✅ تسجيل الحضور اليومي
         </button>
-        <button onClick={() => navigate('/financials')} className="bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+        <button 
+          onClick={() => navigate('/financials')} 
+          className="bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+        >
           💰 تسجيل الأداءات المالية
         </button>
       </div>
@@ -92,7 +143,7 @@ export default function Dashboard() {
             <span>⚠️</span>
             <span>تنبيه: هناك واجبات مستحقة غير مدفوعة بقيمة إجمالية قدرها <strong>{stats.pendingPayments} DH</strong>.</span>
           </div>
-          <button onClick={() => navigate('/financials')} className="text-xs bg-rose-600 text-white px-3 py-1.5 rounded-md font-bold hover:bg-rose-700 transition">
+          <button onClick={() => navigate('/financials')} className="text-xs bg-rose-600 text-white px-3 py-1.5 rounded-md font-bold hover:bg-rose-700 transition cursor-pointer">
             مراجعة المالية
           </button>
         </div>
@@ -177,8 +228,13 @@ export default function Dashboard() {
               <p className="text-xs text-slate-400 text-center py-4">لا توجد مدفوعات مسجلة حالياً</p>
             ) : (
               recentPayments.map((p, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg text-sm border border-slate-100">
-                  <span className="font-semibold text-slate-700">{p.studentName || 'تلميذ'}</span>
+                <div key={p.id || idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg text-sm border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-700">{p.studentName || 'تلميذ'}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.status === 'مؤدى' || p.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {p.status === 'مؤدى' || p.status === 'paid' ? 'مؤدى' : 'غير مؤدى'}
+                    </span>
+                  </div>
                   <span className="font-bold text-emerald-600">{p.amount} درهم</span>
                 </div>
               ))
@@ -197,7 +253,7 @@ export default function Dashboard() {
               <p className="text-xs text-slate-400 text-center py-4">لا يوجد تلاميذ مسجلون حالياً</p>
             ) : (
               recentStudents.map((s, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg text-sm border border-slate-100">
+                <div key={s.id || idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg text-sm border border-slate-100">
                   <div>
                     <p className="font-semibold text-slate-700">{s.fullName}</p>
                     <p className="text-xs text-slate-400">{s.level || 'غير محدد'}</p>

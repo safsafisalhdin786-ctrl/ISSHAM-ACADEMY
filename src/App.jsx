@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -10,18 +10,29 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Attendance from './pages/Attendance';
 import Teachers from './pages/Teachers';
+import Payments from './pages/Payments';
 import Financials from './pages/Financials';
 import AppSettings from './pages/AppSettings';
 
-function Layout({ children }) {
+// مكوّن لحماية المسارات (يقوم بالتأكد من تسجيل الدخول)
+function ProtectedLayout({ children }) {
+  const { currentUser } = useAuth ? useAuth() : { currentUser: true };
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // إذا لم يكن هناك مستخدم مسجل، يتم التوجيه لصفحة تسجيل الدخول
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden dir-rtl font-sans">
+    <div className="flex h-screen bg-slate-50 overflow-hidden text-right" dir="rtl">
+      {/* Sidebar ثابت جهة اليمين */}
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      
+      {/* المساحة الرئيسية المتجاوبة */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header setMobileOpen={setMobileOpen} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
+        <main className="flex-1 overflow-y-auto overflow-x-auto p-4 md:p-6 bg-slate-50">
           {children}
         </main>
       </div>
@@ -34,22 +45,26 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* مسار تسجيل الدخول */}
           <Route path="/login" element={<Login />} />
+
+          {/* المسارات المحمية */}
           <Route
             path="/*"
             element={
-              <Layout>
+              <ProtectedLayout>
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/students" element={<Students />} />
                   <Route path="/attendance" element={<Attendance />} />
                   <Route path="/teachers" element={<Teachers />} />
+                  <Route path="/payments" element={<Payments />} />
                   <Route path="/financials" element={<Financials />} />
                   <Route path="/settings" element={<AppSettings />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
-              </Layout>
+              </ProtectedLayout>
             }
           />
         </Routes>

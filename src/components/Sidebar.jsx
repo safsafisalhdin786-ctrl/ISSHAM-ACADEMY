@@ -18,9 +18,11 @@ export default function Sidebar() {
       <div>
         {/* اللوجو والعنوان */}
         <div style={{ borderColor: '#2d5555' }} className="flex items-center gap-3 p-3 border-b mb-6">
-          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-md">
-            🏫
-          </div>
+          <img 
+            src="/logo.jpg" 
+            alt="ISSHAAM ACADEMY Logo" 
+            className="w-12 h-12 object-contain rounded-full bg-white p-1 shadow-md border-2 border-amber-400"
+          />
           <div>
             <h1 className="font-bold text-lg leading-tight text-white">أكاديمية إسهام</h1>
             <span className="text-xs text-emerald-300">نظام الإدارة المدرسية</span>
