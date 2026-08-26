@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const SettingsContext = createContext();
 
@@ -18,33 +18,42 @@ export function SettingsProvider({ children }) {
       address: 'Moulay Rachid, Casablanca',
       academicYear: '2025/2026',
       teacherPercentage: 50,
-      notes: ''
-    }
+      notes: 'شكراً لثقتكم بأكاديمية إسهام.'
+    },
+    adminEmails: []
   });
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // الاستماع المباشر للتغييرات في Firestore
-    const unsub = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+    const docRef = doc(db, 'settings', 'global');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSettings(prev => ({
-          branding: { ...prev.branding, ...data.branding },
-          general: { ...prev.general, ...data.general }
-        }));
+        setSettings(docSnap.data());
       }
       setLoading(false);
-    }, (err) => {
-      console.error("خطأ جلب الإعدادات:", err);
+    }, (error) => {
+      console.error("خطأ في جلب الإعدادات:", error);
       setLoading(false);
     });
 
-    return () => unsub();
+    return () => unsubscribe();
   }, []);
 
+  const updateSettings = async (newSettings) => {
+    try {
+      const docRef = doc(db, 'settings', 'global');
+      const updated = { ...settings, ...newSettings };
+      await setDoc(docRef, updated, { merge: true });
+      setSettings(updated);
+    } catch (error) {
+      console.error("خطأ أثناء تحديث الإعدادات:", error);
+      throw error;
+    }
+  };
+
   return (
-    <SettingsContext.Provider value={{ settings, setSettings, loading }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, loading }}>
       {children}
     </SettingsContext.Provider>
   );

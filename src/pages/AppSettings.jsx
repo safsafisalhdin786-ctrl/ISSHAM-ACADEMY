@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useSettings } from '../context/SettingsContext';
 
 export default function AppSettings() {
-  const [loading, setLoading] = useState(true);
+  const { settings, updateSettings, loading: contextLoading } = useSettings();
+
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('branding'); // branding | admins | general
@@ -30,43 +32,29 @@ export default function AppSettings() {
   const [adminEmails, setAdminEmails] = useState([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
 
-  // جلب البيانات من Firestore عند فتح الصفحة
+  // مزامنة حالة النموذج مع الإعدادات القادمة من الـ Context
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setLoading(true);
-        const docRef = doc(db, 'settings', 'global');
-        const docSnap = await getDoc(docRef);
+    if (settings) {
+      if (settings.branding) setBranding(prev => ({ ...prev, ...settings.branding }));
+      if (settings.general) setGeneral(prev => ({ ...prev, ...settings.general }));
+      if (settings.adminEmails) setAdminEmails(settings.adminEmails);
+    }
+  }, [settings]);
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.branding) setBranding(prev => ({ ...prev, ...data.branding }));
-          if (data.general) setGeneral(prev => ({ ...prev, ...data.general }));
-          if (data.adminEmails) setAdminEmails(data.adminEmails);
-        }
-      } catch (error) {
-        console.error("خطأ في جلب الإعدادات:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSettings();
-  }, []);
-
-  // حفظ الإعدادات العامة والتصميم
+  // حفظ الإعدادات العامة والتصميم وتحديث الـ Context فوراً
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setMessage('');
     try {
-      await setDoc(doc(db, 'settings', 'global'), {
+      const updatedData = {
         branding,
         general,
         adminEmails
-      }, { merge: true });
+      };
 
-      setMessage('تم حفظ التغييرات والإعدادات بنجاح! ✅');
+      await updateSettings(updatedData);
+      setMessage('تم حفظ التغييرات وتطبيقها فوراً في الموقع كامل! ✅');
     } catch (error) {
       console.error("خطأ في حفظ الإعدادات:", error);
       setMessage('حدث خطأ أثناء حفظ الإعدادات ❌');
@@ -91,8 +79,10 @@ export default function AppSettings() {
       await updateDoc(docRef, {
         adminEmails: arrayUnion(email)
       });
-      setAdminEmails([...adminEmails, email]);
+      const updatedAdmins = [...adminEmails, email];
+      setAdminEmails(updatedAdmins);
       setNewAdminEmail('');
+      await updateSettings({ adminEmails: updatedAdmins });
       setMessage(`تم إضافة ${email} كـ Admin بنجاح ✅`);
     } catch (error) {
       console.error('خطأ في إضافة الأدمن:', error);
@@ -109,14 +99,16 @@ export default function AppSettings() {
       await updateDoc(docRef, {
         adminEmails: arrayRemove(emailToRemove)
       });
-      setAdminEmails(adminEmails.filter(email => email !== emailToRemove));
+      const updatedAdmins = adminEmails.filter(email => email !== emailToRemove);
+      setAdminEmails(updatedAdmins);
+      await updateSettings({ adminEmails: updatedAdmins });
       setMessage(`تم حذف صلاحية ${emailToRemove} بنجاح ✅`);
     } catch (error) {
       console.error('خطأ في حذف الأدمن:', error);
     }
   };
 
-  if (loading) {
+  if (contextLoading) {
     return (
       <div className="p-8 text-center text-slate-600 font-bold dir-rtl">
         جاري تحميل الإعدادات...
