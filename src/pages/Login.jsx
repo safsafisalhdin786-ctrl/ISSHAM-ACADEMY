@@ -10,12 +10,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // بيانات الدخول الإدارية الاحتياطية
+  // بيانات الدخول الإدارية الآمنة
   const DEFAULT_EMAIL = 'admin@isshaam.com';
-  const DEFAULT_PASS = '123456';
+  const DEFAULT_PASS = 'Assham2026@Admin';
 
   const handleLoginSuccess = () => {
-    // حفظ حالة الدخول محلياً كـ Fallback
     localStorage.setItem('isshaam_auth', 'true');
     navigate('/');
   };
@@ -27,21 +26,18 @@ export default function Login() {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. التحقق أولاً من بيانات الدخول الافتراضية محلياً لتفادي مشاكل Firebase Domain
     if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
       handleLoginSuccess();
       setLoading(false);
       return;
     }
 
-    // 2. المحاولة عبر Firebase Auth
     try {
       await signInWithEmailAndPassword(auth, cleanEmail, password);
       handleLoginSuccess();
     } catch (err) {
       console.error('Login error:', err);
       
-      // إذا كان الخطأ متعلقاً بالنطاق غير المصرح أو عدم وجود الحساب، والتفاصيل مطابقة للافتراضي
       if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
           handleLoginSuccess();
@@ -51,7 +47,6 @@ export default function Login() {
       } else if (err.code === 'auth/too-many-requests') {
         setError('تم حظر المحاولات مؤقتاً بسبب كثرة الأخطاء. حاول لاحقاً.');
       } else {
-        // السماح بالدخول المحلي عند وجود مشاكل في الشبكة أو الإعدادات
         if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
           handleLoginSuccess();
           return;
@@ -63,7 +58,6 @@ export default function Login() {
     }
   };
 
-  // الدخول السريع بنقرة واحدة
   const handleQuickLogin = () => {
     setEmail(DEFAULT_EMAIL);
     setPassword(DEFAULT_PASS);
