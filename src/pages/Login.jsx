@@ -24,7 +24,7 @@ export default function Login() {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // التحقق المباشر محلياً (تخطي Firebase تماماً لتجنب خطأ auth/configuration-not-found)
+    // التحقق المباشر محلياً
     if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
       handleLoginSuccess();
     } else {
@@ -43,9 +43,18 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4 dir-rtl" dir="rtl">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
+        
+        {/* قسم اللوغو والعنوان */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">أكاديمية إسهام 🏫</h1>
-          <p className="text-slate-500 text-sm">Groupe Assham - نظام الإدارة المدرسية</p>
+          <div className="flex justify-center mb-3">
+            <img 
+              src="/logo.jpg" 
+              alt="ISSHAM ACADEMY Logo" 
+              className="w-36 h-auto object-contain" 
+            />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">أكاديمية إسهام التعليمية</h1>
+          <p className="text-slate-500 text-xs font-medium">Groupe Assham - منصة المواكبة وإدارة الأكاديمية</p>
         </div>
 
         {error && (
