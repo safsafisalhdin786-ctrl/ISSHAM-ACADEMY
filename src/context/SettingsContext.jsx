@@ -36,35 +36,44 @@ const DEFAULT_SETTINGS = {
   adminEmails: [],
 };
 
-const mergeSettings = (current, incoming = {}) => ({
-  ...DEFAULT_SETTINGS,
-  ...current,
-  ...incoming,
+/**
+ * دمج الإعدادات الافتراضية مع الإعدادات الحالية
+ * والإعدادات الجديدة بدون حذف أي بيانات موجودة.
+ */
+const mergeSettings = (current = {}, incoming = {}) => {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...current,
+    ...incoming,
 
-  branding: {
-    ...DEFAULT_SETTINGS.branding,
-    ...(current?.branding || {}),
-    ...(incoming?.branding || {}),
-  },
+    branding: {
+      ...DEFAULT_SETTINGS.branding,
+      ...(current?.branding || {}),
+      ...(incoming?.branding || {}),
+    },
 
-  general: {
-    ...DEFAULT_SETTINGS.general,
-    ...(current?.general || {}),
-    ...(incoming?.general || {}),
-  },
+    general: {
+      ...DEFAULT_SETTINGS.general,
+      ...(current?.general || {}),
+      ...(incoming?.general || {}),
+    },
 
-  adminEmails: Array.isArray(incoming?.adminEmails)
-    ? incoming.adminEmails
-    : Array.isArray(current?.adminEmails)
-      ? current.adminEmails
-      : DEFAULT_SETTINGS.adminEmails,
-});
+    adminEmails: Array.isArray(incoming?.adminEmails)
+      ? incoming.adminEmails
+      : Array.isArray(current?.adminEmails)
+        ? current.adminEmails
+        : DEFAULT_SETTINGS.adminEmails,
+  };
+};
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [settingsError, setSettingsError] = useState(null);
 
+  /**
+   * الاستماع المباشر لإعدادات الأكاديمية من Firestore
+   */
   useEffect(() => {
     const settingsRef = doc(
       db,
@@ -76,19 +85,34 @@ export function SettingsProvider({ children }) {
       settingsRef,
 
       (snapshot) => {
-        if (snapshot.exists()) {
-          setSettings(
-            mergeSettings(
-              DEFAULT_SETTINGS,
-              snapshot.data()
-            )
-          );
-        } else {
-          setSettings(DEFAULT_SETTINGS);
-        }
+        try {
+          if (snapshot.exists()) {
+            const firestoreSettings = snapshot.data();
 
-        setSettingsError(null);
-        setLoading(false);
+            setSettings(
+              mergeSettings(
+                DEFAULT_SETTINGS,
+                firestoreSettings
+              )
+            );
+          } else {
+            setSettings(DEFAULT_SETTINGS);
+          }
+
+          setSettingsError(null);
+          setLoading(false);
+        } catch (error) {
+          console.error(
+            'خطأ أثناء معالجة إعدادات الأكاديمية:',
+            error
+          );
+
+          setSettings(DEFAULT_SETTINGS);
+          setSettingsError(
+            'تعذر معالجة إعدادات الأكاديمية.'
+          );
+          setLoading(false);
+        }
       },
 
       (error) => {
@@ -101,16 +125,21 @@ export function SettingsProvider({ children }) {
           'تعذر تحميل إعدادات الأكاديمية.'
         );
 
-        // Keep the default configuration
-        // instead of breaking the entire application.
+        // نخلي التطبيق يخدم بالإعدادات الافتراضية
+        // بدل ما يطيح الموقع كامل.
         setSettings(DEFAULT_SETTINGS);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
+  /**
+   * تحديث إعدادات الأكاديمية
+   */
   const updateSettings = async (newSettings = {}) => {
     try {
       const updatedSettings = mergeSettings(
@@ -127,7 +156,9 @@ export function SettingsProvider({ children }) {
       await setDoc(
         settingsRef,
         updatedSettings,
-        { merge: true }
+        {
+          merge: true,
+        }
       );
 
       setSettings(updatedSettings);
@@ -148,10 +179,22 @@ export function SettingsProvider({ children }) {
     }
   };
 
+  /**
+   * إعادة تحميل الإعدادات إلى القيم الافتراضية محلياً
+   */
+  const resetLocalSettings = () => {
+    setSettings(DEFAULT_SETTINGS);
+    setSettingsError(null);
+  };
+
+  /**
+   * قيمة Context محسوبة بشكل آمن
+   */
   const value = useMemo(
     () => ({
       settings,
       updateSettings,
+      resetLocalSettings,
       loading,
       settingsError,
     }),
@@ -169,6 +212,9 @@ export function SettingsProvider({ children }) {
   );
 }
 
+/**
+ * Hook للوصول إلى إعدادات الأكاديمية
+ */
 export function useSettings() {
   const context = useContext(SettingsContext);
 

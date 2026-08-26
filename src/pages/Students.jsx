@@ -1,371 +1,915 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import React, { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../supabase';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [levels, setLevels] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-
-  // إدخال تعليق/ملاحظة حية جديدة للحصة
   const [newComment, setNewComment] = useState('');
 
-  // نموذج الإضافة
   const [formData, setFormData] = useState({
-    fullName: '',
-    level: 'الأولى إعدادي',
-    parentPhone: '',
-    teacherId: '',
-    schoolName: '',
-    monthlyFee: '',
-    weaknesses: '',
-    generalNotes: '' // ملاحظات الأم أو الإدارة
+    first_name: '',
+    last_name: '',
+    full_name: '',
+    level_id: '',
+    class_id: '',
+    parent_name: '',
+    parent_phone: '',
+    parent_whatsapp: '',
+    phone: '',
+    original_school: '',
+    monthly_fee: '',
+    notes: '',
+    status: 'active',
+    archived: false,
+    date_of_birth: '',
   });
 
-  const fetchData = async () => {
+  // =====================================================
+  // LOAD DATA
+  // =====================================================
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    setErrorMessage('');
+
     try {
-      const [studentsSnap, teachersSnap] = await Promise.all([
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'teachers'))
+      const [
+        studentsResult,
+        teachersResult,
+        levelsResult,
+      ] = await Promise.all([
+        supabase
+          .from('students')
+          .select(`
+            *,
+            levels (
+              id,
+              name_ar,
+              name_fr
+            ),
+            classes (
+              id,
+              name,
+              level
+            )
+          `)
+          .eq('archived', false)
+          .order('full_name', { ascending: true }),
+
+        supabase
+          .from('teachers')
+          .select('*')
+          .eq('status', 'active')
+          .order('full_name', { ascending: true }),
+
+        supabase
+          .from('levels')
+          .select('*')
+          .eq('is_active', true)
+          .order('name_ar', { ascending: true }),
       ]);
-      setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.archived));
-      setTeachers(teachersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) {
-      console.error(e);
+
+      if (studentsResult.error) throw studentsResult.error;
+      if (teachersResult.error) throw teachersResult.error;
+      if (levelsResult.error) throw levelsResult.error;
+
+      setStudents(studentsResult.data || []);
+      setTeachers(teachersResult.data || []);
+      setLevels(levelsResult.data || []);
+    } catch (error) {
+      console.error('Students loading error:', error);
+      setErrorMessage(
+        error?.message || 'تعذر تحميل بيانات التلاميذ.'
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // =====================================================
+  // FORM
+  // =====================================================
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
+
+  const resetForm = () => {
+    setFormData({
+      first_name: '',
+      last_name: '',
+      full_name: '',
+      level_id: '',
+      class_id: '',
+      parent_name: '',
+      parent_phone: '',
+      parent_whatsapp: '',
+      phone: '',
+      original_school: '',
+      monthly_fee: '',
+      notes: '',
+      status: 'active',
+      archived: false,
+      date_of_birth: '',
+    });
+  };
+
+  // =====================================================
+  // ADD STUDENT
+  // =====================================================
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.parentPhone) return alert('المرجو إدخال اسم التلميذ وهاتف الولي');
+
+    if (!formData.full_name.trim()) {
+      alert('المرجو إدخال اسم التلميذ.');
+      return;
+    }
+
+    if (!formData.parent_phone.trim()) {
+      alert('المرجو إدخال رقم هاتف الولي.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage('');
 
     try {
-      await addDoc(collection(db, 'students'), {
-        ...formData,
-        sessionLogs: [], // سجل الحصص والملاحظات اليومية
-        attendanceHistory: [], // سجل الحضور والغياب
-        createdAt: serverTimestamp(),
-        archived: false
-      });
+      const payload = {
+        first_name:
+          formData.first_name.trim() || null,
+
+        last_name:
+          formData.last_name.trim() || null,
+
+        full_name:
+          formData.full_name.trim(),
+
+        level_id:
+          formData.level_id || null,
+
+        class_id:
+          formData.class_id || null,
+
+        parent_name:
+          formData.parent_name.trim() || null,
+
+        parent_phone:
+          formData.parent_phone.trim(),
+
+        parent_whatsapp:
+          formData.parent_whatsapp.trim() ||
+          formData.parent_phone.trim(),
+
+        phone:
+          formData.phone.trim() || null,
+
+        original_school:
+          formData.original_school.trim() || null,
+
+        monthly_fee:
+          formData.monthly_fee === ''
+            ? 0
+            : Number(formData.monthly_fee),
+
+        notes:
+          formData.notes.trim() || null,
+
+        status: 'active',
+        archived: false,
+
+        date_of_birth:
+          formData.date_of_birth || null,
+      };
+
+      const { error } = await supabase
+        .from('students')
+        .insert(payload);
+
+      if (error) throw error;
+
+      alert('تمت إضافة التلميذ بنجاح ✅');
+
       setShowAddModal(false);
-      setFormData({
-        fullName: '', level: 'الأولى إعدادي', parentPhone: '',
-        teacherId: '', schoolName: '', monthlyFee: '',
-        weaknesses: '', generalNotes: ''
-      });
-      fetchData();
+      resetForm();
+
+      await fetchData();
     } catch (error) {
-      console.error("خطأ في إضافة التلميذ:", error);
+      console.error('Add student error:', error);
+
+      setErrorMessage(
+        error?.message ||
+          'حدث خطأ أثناء إضافة التلميذ.'
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
-  // دالة حذف التلميذ نهائياً
-  const handleDeleteStudent = async (studentId, studentName) => {
-    const confirmDelete = window.confirm(`هل أنت تأكد من رغبتك في حذف التلميذ: (${studentName}) نهائياً؟`);
-    if (!confirmDelete) return;
+  // =====================================================
+  // DELETE / ARCHIVE STUDENT
+  // =====================================================
+
+  const handleDeleteStudent = async (
+    studentId,
+    studentName
+  ) => {
+    const confirmed = window.confirm(
+      `هل أنت متأكد من حذف/أرشفة التلميذ "${studentName}"؟`
+    );
+
+    if (!confirmed) return;
 
     try {
-      await deleteDoc(doc(db, 'students', studentId));
-      if (selectedStudent && selectedStudent.id === studentId) {
+      /*
+       * ما غاديش نحذفوه نهائياً.
+       * غادي نديروه archived = true
+       * باش ما نضيعوش سجلات الحضور والأداء.
+       */
+
+      const { error } = await supabase
+        .from('students')
+        .update({
+          archived: true,
+          status: 'inactive',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      if (
+        selectedStudent &&
+        selectedStudent.id === studentId
+      ) {
         setSelectedStudent(null);
       }
-      fetchData();
+
+      await fetchData();
     } catch (error) {
-      console.error("خطأ في حذف التلميذ:", error);
-      alert("حدث خطأ أثناء محاولة الحذف، المرجو المحاولة مرة أخرى.");
+      console.error('Delete student error:', error);
+
+      setErrorMessage(
+        error?.message ||
+          'حدث خطأ أثناء أرشفة التلميذ.'
+      );
     }
   };
 
-  // إضافة تعليق أو ملاحظة جديدة على حصة التلميذ
+  // =====================================================
+  // SESSION COMMENT
+  // =====================================================
+
   const handleAddSessionComment = async (e) => {
     e.preventDefault();
-    if (!newComment.trim() || !selectedStudent) return;
 
-    const logEntry = {
-      date: new Date().toLocaleDateString('ar-MA', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }),
-      time: new Date().toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' }),
-      text: newComment
-    };
+    if (!newComment.trim() || !selectedStudent) {
+      return;
+    }
+
+    /*
+     * بما أن جدول students الحالي ما فيهش sessionLogs
+     * غادي نخزن الملاحظة داخل notes.
+     */
+
+    const currentNotes =
+      selectedStudent.notes || '';
+
+    const dateText =
+      new Date().toLocaleString('ar-MA');
+
+    const updatedNotes =
+      currentNotes.trim()
+        ? `${currentNotes}\n\n[${dateText}] ${newComment.trim()}`
+        : `[${dateText}] ${newComment.trim()}`;
 
     try {
-      const studentRef = doc(db, 'students', selectedStudent.id);
-      await updateDoc(studentRef, {
-        sessionLogs: arrayUnion(logEntry)
+      const { data, error } = await supabase
+        .from('students')
+        .update({
+          notes: updatedNotes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedStudent.id)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      setSelectedStudent({
+        ...selectedStudent,
+        ...data,
       });
 
-      // تحديث الواجهة المباشرة
-      const updatedStudent = {
-        ...selectedStudent,
-        sessionLogs: [logEntry, ...(selectedStudent.sessionLogs || [])]
-      };
-      setSelectedStudent(updatedStudent);
       setNewComment('');
-      fetchData();
+
+      await fetchData();
     } catch (error) {
-      console.error("خطأ في حفظ الملاحظة:", error);
+      console.error(
+        'Comment save error:',
+        error
+      );
+
+      setErrorMessage(
+        error?.message ||
+          'تعذر حفظ الملاحظة.'
+      );
     }
   };
 
+  // =====================================================
+  // TEACHER
+  // =====================================================
+
+  const getTeacherForStudent = (student) => {
+    /*
+     * students table الحالية ما فيهاش teacher_id.
+     * لذلك ما غاديش نخترعو علاقة غير موجودة.
+     */
+
+    return null;
+  };
+
+  // =====================================================
+  // WHATSAPP
+  // =====================================================
+
+  const sendWhatsApp = (student) => {
+    const phone =
+      student.parent_whatsapp ||
+      student.parent_phone;
+
+    if (!phone) {
+      alert(
+        'رقم واتساب الولي غير موجود.'
+      );
+      return;
+    }
+
+    let clean = phone
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/-/g, '');
+
+    if (clean.startsWith('+')) {
+      clean = clean.substring(1);
+    }
+
+    if (clean.startsWith('0')) {
+      clean = `212${clean.substring(1)}`;
+    }
+
+    const message =
+      `السلام عليكم ورحمة الله وبركاته،\n\n` +
+      `تواصل معكم إدارة *أكاديمية إسهام* 🏫 ` +
+      `بخصوص التلميذ(ة) *${student.full_name}*.\n\n` +
+      `شكراً لتعاونكم. 🌹`;
+
+    window.open(
+      `https://wa.me/${clean}?text=${encodeURIComponent(message)}`,
+      '_blank'
+    );
+  };
+
+  // =====================================================
+  // LOADING
+  // =====================================================
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-slate-700 font-bold dir-rtl">
+        جاري تحميل ملفات التلاميذ...
+      </div>
+    );
+  }
+
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
-    <div className="space-y-6 dir-rtl text-right pb-10 font-sans">
-      <div className="flex justify-between items-center bg-white p-5 rounded-xl shadow-md border border-slate-300">
+    <div className="space-y-6 dir-rtl text-right pb-10">
+
+      {/* HEADER */}
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl shadow-md border border-slate-300">
+
         <div>
-          <h2 className="text-2xl font-black text-slate-900">إدارة ملفات التلاميذ 👥</h2>
-          <p className="text-sm font-bold text-slate-600">عرض الملفات، التقرير الشهري للغياب، وملاحظات الحصص</p>
+          <h2 className="text-2xl font-black text-slate-900">
+            إدارة ملفات التلاميذ 👥
+          </h2>
+
+          <p className="text-sm font-bold text-slate-600">
+            إدارة معلومات التلاميذ والملفات الدراسية
+          </p>
         </div>
+
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-black shadow-md cursor-pointer transition"
+          className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-black shadow-md"
         >
           ➕ إضافة تلميذ جديد
         </button>
       </div>
 
-      {loading ? (
-        <div className="p-8 bg-white rounded-xl text-center text-slate-700 font-bold border border-slate-300">
-          جاري تحميل ملفات التلاميذ...
+      {/* ERROR */}
+
+      {errorMessage && (
+        <div className="p-4 bg-red-100 border-2 border-red-400 text-red-900 rounded-xl font-bold">
+          ❌ {errorMessage}
+        </div>
+      )}
+
+      {/* STUDENTS */}
+
+      {students.length === 0 ? (
+        <div className="bg-white rounded-xl border p-8 text-center font-bold text-slate-600">
+          لا يوجد تلاميذ حالياً.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {students.map(s => {
-            const teacher = teachers.find(t => t.id === s.teacherId);
-            return (
-              <div key={s.id} className="bg-white rounded-xl shadow-md border border-slate-300 p-5 flex flex-col justify-between hover:shadow-lg transition border-t-4 border-t-blue-600">
-                <div>
-                  <div className="flex justify-between items-start border-b pb-3 border-slate-200">
-                    <div>
-                      <h3 className="text-xl font-black text-slate-900">{s.fullName}</h3>
-                      <span className="inline-block mt-1 px-2.5 py-0.5 bg-blue-100 text-blue-900 rounded-md font-bold text-xs">
-                        {s.level}
-                      </span>
-                    </div>
-                    <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-1 rounded">
-                      {s.monthlyFee ? `${s.monthlyFee} درهم` : '—'}
-                    </span>
-                  </div>
 
-                  <div className="mt-4 space-y-2 text-xs font-bold text-slate-800">
-                    <p><span className="text-slate-500">👨‍🏫 الأستاذ:</span> {teacher ? (teacher.name || teacher.fullName) : 'غير محدد'}</p>
-                    <p><span className="text-slate-500">📞 هاتف الولي:</span> {s.parentPhone || '—'}</p>
-                    <p><span className="text-slate-500">🏫 المدرسة:</span> {s.schoolName || 'غير محددة'}</p>
-                  </div>
+          {students.map((student) => {
+            const teacher =
+              getTeacherForStudent(student);
+
+            return (
+              <div
+                key={student.id}
+                className="bg-white rounded-xl shadow-md border border-slate-300 p-5 border-t-4 border-t-blue-600"
+              >
+
+                <div className="border-b pb-3">
+                  <h3 className="text-xl font-black text-slate-900">
+                    {student.full_name}
+                  </h3>
+
+                  <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-900 rounded-md text-xs font-black">
+                    {student.levels?.name_ar ||
+                      'المستوى غير محدد'}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2 text-sm font-bold text-slate-800">
+
+                  <p>
+                    📞 هاتف الولي:
+                    <span className="text-blue-700">
+                      {' '}
+                      {student.parent_phone || '—'}
+                    </span>
+                  </p>
+
+                  <p>
+                    🏫 المدرسة:
+                    {' '}
+                    {student.original_school || '—'}
+                  </p>
+
+                  <p>
+                    💰 الواجب الشهري:
+                    {' '}
+                    {student.monthly_fee || 0} درهم
+                  </p>
+
+                  <p>
+                    👨‍🏫 الأستاذ:
+                    {' '}
+                    {teacher?.full_name || 'غير محدد'}
+                  </p>
+
                 </div>
 
                 <div className="mt-5 flex gap-2">
+
                   <button
-                    onClick={() => setSelectedStudent(s)}
-                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-black text-xs text-center flex justify-center items-center gap-1 cursor-pointer"
+                    onClick={() =>
+                      setSelectedStudent(student)
+                    }
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-black text-xs"
                   >
                     📂 فتح الملف
                   </button>
+
                   <button
-                    onClick={() => handleDeleteStudent(s.id, s.fullName)}
-                    className="px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-black rounded-lg text-xs cursor-pointer transition border border-red-300"
-                    title="حذف التلميذ"
+                    onClick={() =>
+                      sendWhatsApp(student)
+                    }
+                    className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-black text-xs"
                   >
-                    🗑️ حذف
+                    📲
                   </button>
+
+                  <button
+                    onClick={() =>
+                      handleDeleteStudent(
+                        student.id,
+                        student.full_name
+                      )
+                    }
+                    className="px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-black text-xs"
+                  >
+                    🗑️
+                  </button>
+
                 </div>
+
               </div>
             );
           })}
+
         </div>
       )}
 
-      {/* نافذة الملف التفصيلي الشامل (التقرير للولي) */}
+      {/* =====================================================
+          STUDENT PROFILE MODAL
+      ===================================================== */}
+
       {selectedStudent && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl border-2 border-slate-300 max-h-[90vh] overflow-y-auto">
-            
-            <div className="flex justify-between items-center border-b pb-3 mb-4">
+
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+
+            <div className="flex justify-between items-center border-b pb-3 mb-5">
+
               <div>
-                <h3 className="text-2xl font-black text-slate-900">ملف التلميذ: {selectedStudent.fullName}</h3>
-                <p className="text-sm text-slate-600 font-bold">{selectedStudent.level} — {selectedStudent.schoolName || 'المؤسسة الأصلية غير محددة'}</p>
+                <h3 className="text-2xl font-black">
+                  ملف التلميذ
+                </h3>
+
+                <p className="text-lg font-bold text-blue-700">
+                  {selectedStudent.full_name}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.fullName)} 
-                  className="px-3 py-1 bg-red-600 text-white font-black rounded hover:bg-red-700 text-xs"
+
+              <button
+                onClick={() =>
+                  setSelectedStudent(null)
+                }
+                className="px-3 py-2 bg-slate-200 rounded-lg font-black"
+              >
+                ✖
+              </button>
+
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <strong>المستوى:</strong>
+                <p>
+                  {selectedStudent.levels?.name_ar ||
+                    'غير محدد'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <strong>القسم:</strong>
+                <p>
+                  {selectedStudent.classes?.name ||
+                    'غير محدد'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <strong>هاتف الولي:</strong>
+                <p>
+                  {selectedStudent.parent_phone ||
+                    'غير موجود'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <strong>الواجب الشهري:</strong>
+                <p>
+                  {selectedStudent.monthly_fee || 0} درهم
+                </p>
+              </div>
+
+            </div>
+
+            <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+
+              <h4 className="font-black text-amber-900 mb-2">
+                📝 ملاحظات التلميذ
+              </h4>
+
+              <p className="whitespace-pre-line text-slate-800">
+                {selectedStudent.notes ||
+                  'لا توجد ملاحظات.'}
+              </p>
+
+            </div>
+
+            <div className="mt-5 bg-slate-100 p-4 rounded-xl">
+
+              <h4 className="font-black mb-3">
+                ✍️ إضافة ملاحظة بعد الحصة
+              </h4>
+
+              <form
+                onSubmit={handleAddSessionComment}
+                className="flex flex-col md:flex-row gap-2"
+              >
+
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) =>
+                    setNewComment(e.target.value)
+                  }
+                  placeholder="اكتب الملاحظة..."
+                  className="flex-1 p-3 border-2 border-slate-300 rounded-lg"
+                />
+
+                <button
+                  type="submit"
+                  className="px-5 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-black"
                 >
-                  🗑️ مسح التلميذ
+                  إضافة ➕
                 </button>
-                <button onClick={() => setSelectedStudent(null)} className="px-3 py-1 bg-slate-200 text-slate-800 font-black rounded hover:bg-slate-300 text-xs">✖ إغلاق</button>
-              </div>
-            </div>
 
-            <div className="space-y-5 font-bold text-slate-800 text-xs">
-              
-              {/* معلومات سريعة */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
-                <p>📞 هاتف الولي: <span className="text-blue-800 font-black">{selectedStudent.parentPhone}</span></p>
-                <p>👨‍🏫 الأستاذ: <span className="text-slate-900 font-black">{teachers.find(t => t.id === selectedStudent.teacherId)?.name || 'غير محدد'}</span></p>
-                <p>💰 الواجب الشهري: <span className="text-emerald-800 font-black">{selectedStudent.monthlyFee || 0} درهم</span></p>
-              </div>
-
-              {/* نقاط الضعف والملاحظات الشخصية */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                  <h4 className="text-amber-900 font-black text-sm mb-1">⚠️ الصعوبات ونقاط الضعف:</h4>
-                  <p className="text-amber-950 whitespace-pre-line">{selectedStudent.weaknesses || 'لا توجد صعوبات مسجلة'}</p>
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <h4 className="text-blue-900 font-black text-sm mb-1">💬 ملاحظات الولي / الإدارة:</h4>
-                  <p className="text-blue-950 whitespace-pre-line">{selectedStudent.generalNotes || 'لا توجد ملاحظات خاصة'}</p>
-                </div>
-              </div>
-
-              {/* قسم إضافة ملاحظة أو تعليق بعد الحصة */}
-              <div className="bg-slate-100 p-4 rounded-xl border border-slate-300 space-y-2">
-                <h4 className="text-slate-900 font-black text-sm">✍️ إضافة ملاحظة بعد الحصة (مباشرة فـ الملف):</h4>
-                <form onSubmit={handleAddSessionComment} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="مثال: تمت الحصة بنجاح، فهم الدرس جيداً، بدا كيتحسن..."
-                    className="flex-1 p-2.5 border-2 border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600 bg-white"
-                  />
-                  <button type="submit" className="px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-lg text-xs cursor-pointer">
-                    إضافة الملاحظة ➕
-                  </button>
-                </form>
-              </div>
-
-              {/* سجل الحصص والملاحظات اليومية */}
-              <div className="border rounded-xl p-4 bg-white space-y-3">
-                <h4 className="text-sm font-black text-slate-900 border-b pb-2">📜 سجل ملاحظات وتطور الحصص:</h4>
-                {selectedStudent.sessionLogs && selectedStudent.sessionLogs.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {selectedStudent.sessionLogs.map((log, index) => (
-                      <div key={index} className="p-2.5 bg-slate-50 border-r-4 border-r-blue-600 rounded text-xs">
-                        <div className="flex justify-between text-slate-500 text-[10px] mb-1 font-bold">
-                          <span>📅 {log.date}</span>
-                          <span>⏰ {log.time}</span>
-                        </div>
-                        <p className="text-slate-900 font-extrabold">{log.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500 font-bold text-center py-2">لا توجد ملاحظات مسجلة للحصص بعد</p>
-                )}
-              </div>
-
-              {/* خلاصة وسجل الحضور والغياب */}
-              <div className="border rounded-xl p-4 bg-white space-y-3">
-                <h4 className="text-sm font-black text-slate-900 border-b pb-2">📅 سجل الحضور والغياب الشهري:</h4>
-                {selectedStudent.attendanceHistory && selectedStudent.attendanceHistory.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-                    {selectedStudent.attendanceHistory.map((att, idx) => (
-                      <div key={idx} className={`p-2 rounded font-black text-center border ${att.status === 'حاضر' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-red-50 text-red-800 border-red-300'}`}>
-                        <p className="text-[10px] text-slate-600">{att.date}</p>
-                        <p>{att.status === 'حاضر' ? '✅ حاضر' : '❌ غائب'}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500 font-bold text-center py-2">يتم تسجيل غياب وحضور التلميذ تلقائياً من قسم الحضور والغياب</p>
-                )}
-              </div>
+              </form>
 
             </div>
+
+            <div className="mt-5 flex gap-2">
+
+              <button
+                onClick={() =>
+                  sendWhatsApp(selectedStudent)
+                }
+                className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-black"
+              >
+                📲 تواصل مع الولي
+              </button>
+
+              <button
+                onClick={() =>
+                  handleDeleteStudent(
+                    selectedStudent.id,
+                    selectedStudent.full_name
+                  )
+                }
+                className="px-5 py-3 bg-red-600 text-white rounded-lg font-black"
+              >
+                🗑️ أرشفة
+              </button>
+
+            </div>
+
           </div>
         </div>
       )}
 
-      {/* نافذة إضافة تلميذ جديد بالخيارات المحددة */}
+      {/* =====================================================
+          ADD STUDENT MODAL
+      ===================================================== */}
+
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xl border-2 border-slate-300 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-black text-slate-900 mb-4 border-b pb-2">إضافة تلميذ جديد 👨‍🎓</h3>
-            <form onSubmit={handleAddStudent} className="space-y-4 text-xs font-bold">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-slate-800">اسم التلميذ الكامل *</label>
-                  <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg text-slate-900" placeholder="مثال: محمد العلمي" />
-                </div>
-                <div>
-                  <label className="block mb-1 text-slate-800">المستوى الدراسي *</label>
-                  <select name="level" value={formData.level} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg bg-white text-slate-900">
-                    <optgroup label="التعليم الابتدائي">
-                      <option value="الأول ابتدائي">الأول ابتدائي</option>
-                      <option value="الثاني ابتدائي">الثاني ابتدائي</option>
-                      <option value="الثالث ابتدائي">الثالث ابتدائي</option>
-                      <option value="الرابع ابتدائي">الرابع ابتدائي</option>
-                      <option value="الخامس ابتدائي">الخامس ابتدائي</option>
-                      <option value="السادس ابتدائي">السادس ابتدائي</option>
-                    </optgroup>
-                    <optgroup label="التعليم الإعدادي">
-                      <option value="الأولى إعدادي">الأولى إعدادي</option>
-                      <option value="الثانية إعدادي">الثانية إعدادي</option>
-                      <option value="الثالثة إعدادي">الثالثة إعدادي</option>
-                    </optgroup>
-                    <optgroup label="التعليم الثانوي">
-                      <option value="الجذع المشترك">الجذع المشترك</option>
-                      <option value="الأولى باكالوريا">الأولى باكالوريا</option>
-                      <option value="الثانية باكالوريا">الثانية باكالوريا</option>
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-slate-800">رقم هاتف الولي (واتساب) *</label>
-                  <input type="text" name="parentPhone" required value={formData.parentPhone} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg text-slate-900" placeholder="0612345678" />
-                </div>
-                <div>
-                  <label className="block mb-1 text-slate-800">الأستاذ المسؤول</label>
-                  <select name="teacherId" value={formData.teacherId} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg bg-white text-slate-900">
-                    <option value="">اختيار الأستاذ</option>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name || t.fullName} ({t.subject || ''})</option>)}
-                  </select>
-                </div>
-              </div>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h3 className="text-xl font-black border-b pb-3 mb-5">
+              إضافة تلميذ جديد 👨‍🎓
+            </h3>
+
+            <form
+              onSubmit={handleAddStudent}
+              className="space-y-4"
+            >
+
+              <div className="grid md:grid-cols-2 gap-3">
+
                 <div>
-                  <label className="block mb-1 text-slate-800">المؤسسة الأصلية</label>
-                  <input type="text" name="schoolName" value={formData.schoolName} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg text-slate-900" placeholder="مثال: مدرسة الإمام علي" />
+                  <label className="font-bold">
+                    الاسم الأول
+                  </label>
+
+                  <input
+                    name="first_name"
+                    value={formData.first_name}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
                 </div>
+
                 <div>
-                  <label className="block mb-1 text-slate-800">الواجب الشهري (درهم)</label>
-                  <input type="number" name="monthlyFee" value={formData.monthlyFee} onChange={handleChange} className="w-full p-2.5 border-2 rounded-lg text-slate-900" placeholder="300" />
+                  <label className="font-bold">
+                    النسب
+                  </label>
+
+                  <input
+                    name="last_name"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
                 </div>
+
               </div>
 
               <div>
-                <label className="block mb-1 text-slate-800">⚠️ نقط الضعف والمشاكل الدراسية</label>
-                <textarea name="weaknesses" rows="2" value={formData.weaknesses} onChange={handleChange} className="w-full p-2 border-2 rounded-lg text-slate-900" placeholder="مثال: ناقص فـ القواعد، تعثر فـ الحساب..." ></textarea>
+                <label className="font-bold">
+                  الاسم الكامل *
+                </label>
+
+                <input
+                  name="full_name"
+                  required
+                  value={formData.full_name}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 rounded-lg"
+                  placeholder="مثال: محمد العلمي"
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+
+                <div>
+                  <label className="font-bold">
+                    المستوى الدراسي
+                  </label>
+
+                  <select
+                    name="level_id"
+                    value={formData.level_id}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg bg-white"
+                  >
+
+                    <option value="">
+                      اختيار المستوى
+                    </option>
+
+                    {levels.map((level) => (
+                      <option
+                        key={level.id}
+                        value={level.id}
+                      >
+                        {level.name_ar}
+                      </option>
+                    ))}
+
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold">
+                    تاريخ الازدياد
+                  </label>
+
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={formData.date_of_birth}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
+                </div>
+
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+
+                <div>
+                  <label className="font-bold">
+                    اسم الولي
+                  </label>
+
+                  <input
+                    name="parent_name"
+                    value={formData.parent_name}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold">
+                    هاتف الولي *
+                  </label>
+
+                  <input
+                    name="parent_phone"
+                    required
+                    value={formData.parent_phone}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                    placeholder="0612345678"
+                  />
+                </div>
+
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+
+                <div>
+                  <label className="font-bold">
+                    هاتف التلميذ
+                  </label>
+
+                  <input
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold">
+                    المدرسة الأصلية
+                  </label>
+
+                  <input
+                    name="original_school"
+                    value={formData.original_school}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 rounded-lg"
+                  />
+                </div>
+
               </div>
 
               <div>
-                <label className="block mb-1 text-slate-800">💬 ملاحظات إضافية (ملاحظات الأم أو الإدارة)</label>
-                <textarea name="generalNotes" rows="2" value={formData.generalNotes} onChange={handleChange} className="w-full p-2 border-2 rounded-lg text-slate-900" placeholder="أي معلومات أو وصايا قالتها الأم عند التسجيل..." ></textarea>
+                <label className="font-bold">
+                  الواجب الشهري
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  name="monthly_fee"
+                  value={formData.monthly_fee}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold">
+                  📝 ملاحظات
+                </label>
+
+                <textarea
+                  name="notes"
+                  rows="3"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 rounded-lg"
+                />
               </div>
 
               <div className="flex gap-2 pt-3 border-t">
-                <button type="submit" className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black text-sm cursor-pointer">حفظ التلميذ ✅</button>
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2.5 bg-slate-200 text-slate-800 rounded-lg font-bold">إلغاء</button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black disabled:opacity-50"
+                >
+                  {saving
+                    ? 'جاري الحفظ...'
+                    : 'حفظ التلميذ ✅'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    resetForm();
+                  }}
+                  className="px-5 py-3 bg-slate-200 rounded-lg font-black"
+                >
+                  إلغاء
+                </button>
+
               </div>
+
             </form>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }
