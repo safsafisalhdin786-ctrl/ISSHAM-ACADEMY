@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 export default function Payments() {
   const [students, setStudents] = useState([]);
@@ -30,7 +30,7 @@ export default function Payments() {
       const loadedPayments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPayments(loadedPayments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     } catch (e) {
-      console.error(e);
+      console.error("خطأ في جلب البيانات:", e);
     } finally {
       setLoading(false);
     }
@@ -78,6 +78,19 @@ export default function Payments() {
     }
   };
 
+  // حذف وصل/عملية أداء من Firestore (سلة المهملات)
+  const handleDeletePayment = async (paymentId, receiptNo) => {
+    if (window.confirm(`هل أنت تأكد من رغبتك في نقل/حذف الوصل رقم ${receiptNo} إلى سلة المهملات؟`)) {
+      try {
+        await deleteDoc(doc(db, 'payments', paymentId));
+        setPayments(prev => prev.filter(p => p.id !== paymentId));
+      } catch (error) {
+        console.error("خطأ أثناء حذف الوصل:", error);
+        alert("حدث خطأ أثناء عملية الحذف");
+      }
+    }
+  };
+
   // إرسال وصل الاستلام عبر الواتساب عند تسديد الواجب
   const sendWhatsAppReceipt = (receipt) => {
     if (!receipt.parentPhone) return alert('رقم هاتف الولي غير متوفر لهذا التلميذ');
@@ -100,7 +113,7 @@ export default function Payments() {
 الحالة: ✅ *مكاشي - PAYÉ*
 
 نسأل الله بالتوفيق والنجاح لأبنائنا الكرام! 🎓
-_إدارة أركاديمية عصام للدعم والتميز_`;
+_إدارة أكاديمية عصام للدعم والتميز_`;
 
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -214,7 +227,7 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
               </div>
               <button
                 onClick={() => sendWhatsAppReminder(st)}
-                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-[11px] flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-[11px] flex items-center gap-1 cursor-pointer"
               >
                 📱 تذكير بالأداء
               </button>
@@ -257,13 +270,20 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
                         onClick={() => setPrintedReceipt(p)}
                         className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-black rounded cursor-pointer"
                       >
-                        🖨️ معاينة الوصل
+                        🖨️ معاينة
                       </button>
                       <button
                         onClick={() => sendWhatsAppReceipt(p)}
                         className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded cursor-pointer"
                       >
-                        📲 إرسال بالواتساب
+                        📲 واتساب
+                      </button>
+                      <button
+                        onClick={() => handleDeletePayment(p.id, p.receiptNo)}
+                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-black rounded cursor-pointer"
+                        title="حذف إلى سلة المهملات"
+                      >
+                        🗑️ حذف
                       </button>
                     </td>
                   </tr>
@@ -276,40 +296,37 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
         )}
       </div>
 
-      {/* النافذة المنبثقة للطباعة المعززة بـ (الكاشي واللوغو ورسالة الشكر) */}
+      {/* النافذة المنبثقة للطباعة */}
       {printedReceipt && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg border-2 border-slate-400">
             
-            {/* أزرار الإعلانات فوق */}
             <div className="flex justify-between items-center mb-4 print:hidden">
               <span className="font-black text-slate-800 text-sm">معاينة وصل الأداء الرسمية</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => sendWhatsAppReceipt(printedReceipt)}
-                  className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded hover:bg-emerald-700"
+                  className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded hover:bg-emerald-700 cursor-pointer"
                 >
                   📲 إرسال للواتساب
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-blue-700 text-white font-black text-xs rounded hover:bg-blue-800"
+                  className="px-3 py-1.5 bg-blue-700 text-white font-black text-xs rounded hover:bg-blue-800 cursor-pointer"
                 >
                   🖨️ طباعة الآن
                 </button>
                 <button
                   onClick={() => setPrintedReceipt(null)}
-                  className="px-3 py-1.5 bg-slate-200 text-slate-800 font-black text-xs rounded hover:bg-slate-300"
+                  className="px-3 py-1.5 bg-slate-200 text-slate-800 font-black text-xs rounded hover:bg-slate-300 cursor-pointer"
                 >
                   إغلاق ✖
                 </button>
               </div>
             </div>
 
-            {/* بطاقة الوصل المصممة مع اللوغو والكاشي الرسمي */}
             <div className="relative border-4 border-slate-900 p-6 rounded-lg bg-white text-slate-900 space-y-4 text-right overflow-hidden shadow-inner">
               
-              {/* الكاشي الإداري المائي والأحمر 🔴 */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-22deg] pointer-events-none opacity-85">
                 <div className="border-4 border-dashed border-red-600 rounded-full w-44 h-44 flex flex-col justify-center items-center text-center p-2 bg-red-50/30">
                   <span className="text-xs font-black text-red-600 tracking-wider">★ ISSHAAM ACADEMY ★</span>
@@ -318,7 +335,6 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
                 </div>
               </div>
 
-              {/* الشعار والرأسية */}
               <div className="border-b-2 border-slate-900 pb-3 flex justify-between items-center relative z-10">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-blue-900 text-white rounded-xl flex items-center justify-center font-black text-xl shadow">
@@ -339,7 +355,6 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
                 وصل استلام الواجب الشهري الرسمي — REÇU DE PAIEMENT
               </div>
 
-              {/* بيانات الوصل التفصيلية */}
               <div className="space-y-2 text-xs font-bold pt-1 relative z-10">
                 <div className="flex justify-between border-b pb-1 border-slate-200">
                   <span className="text-slate-600">اسم التلميذ(ة):</span>
@@ -369,7 +384,6 @@ _إدارة أركاديمية عصام للدعم والتميز_`;
                 )}
               </div>
 
-              {/* عبارات الشكر والتقدير */}
               <div className="bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 text-center relative z-10">
                 <p className="text-[11px] font-black text-blue-950">🌟 نشكركم على ثقتكم الغالية فـ أكاديمية ISSHAAM. نسأل الله التوفيق والنجاح لأبنائنا الكرام! 🌟</p>
               </div>
