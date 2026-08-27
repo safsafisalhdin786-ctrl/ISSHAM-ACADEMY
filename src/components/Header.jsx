@@ -12,7 +12,7 @@ export default function Header({ setMobileOpen }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-6 py-3">
+    <header className="sticky top-0 z-30 bg-[#0B192C] text-white border-b border-[#1E3E62] px-4 sm:px-6 py-3 shadow-lg">
       <div className="flex items-center justify-between gap-4">
 
         {/* Mobile menu */}
@@ -20,7 +20,7 @@ export default function Header({ setMobileOpen }) {
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="فتح القائمة"
-          className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition"
+          className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-slate-200 hover:bg-[#1E3E62] active:bg-[#1E3E62] transition"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -41,10 +41,10 @@ export default function Header({ setMobileOpen }) {
         {/* Academy identity */}
         <div className="flex items-center gap-3 mr-auto">
           <div className="hidden sm:block text-right">
-            <h1 className="text-lg font-bold text-slate-800 leading-tight">
+            <h1 className="text-lg font-bold text-white leading-tight">
               ISSHAAM ACADEMY
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-300 mt-0.5">
               نظام إدارة الأكاديمية
             </p>
           </div>
@@ -57,7 +57,7 @@ export default function Header({ setMobileOpen }) {
           <button
             type="button"
             aria-label="الإشعارات"
-            className="relative flex items-center justify-center w-10 h-10 rounded-xl text-slate-600 hover:bg-slate-100 transition"
+            className="relative flex items-center justify-center w-10 h-10 rounded-xl text-slate-200 hover:bg-[#1E3E62] transition"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -92,7 +92,7 @@ export default function Header({ setMobileOpen }) {
               type="button"
               onClick={handleLogout}
               title="تسجيل الخروج"
-              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold hover:bg-rose-100 hover:text-rose-700 transition"
+              className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#0B192C] font-bold hover:bg-amber-300 transition"
             >
               {(userData?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
             </button>

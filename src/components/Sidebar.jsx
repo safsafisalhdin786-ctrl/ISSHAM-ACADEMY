@@ -87,7 +87,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
       <aside
         dir={isFr ? 'ltr' : 'rtl'}
         style={{
-          backgroundColor: '#1a3838',
+          backgroundColor: '#0B192C',
           color: '#ffffff',
         }}
         className={`
@@ -113,7 +113,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
           {/* Academy branding */}
           <div
-            style={{ borderColor: '#2d5555' }}
+            style={{ borderColor: '#1E3E62' }}
             className="relative flex items-center gap-3 p-3 border-b mb-5"
           >
             <img
@@ -129,7 +129,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                 {academyName}
               </h1>
 
-              <span className="block text-xs text-emerald-300 mt-1">
+              <span className="block text-xs text-amber-300 mt-1">
                 {isFr
                   ? 'Système de Gestion'
                   : 'نظام إدارة الأكاديمية'}
@@ -187,8 +187,8 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
         {/* Footer */}
         <div
           style={{
-            backgroundColor: '#132c2c',
-            borderColor: '#254d4d',
+            backgroundColor: '#081426',
+            borderColor: '#1E3E62',
           }}
           className="mt-4 p-3 rounded-xl border text-xs text-center space-y-1 shrink-0"
         >

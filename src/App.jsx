@@ -68,7 +68,7 @@ function ProtectedLayout() {
 
   return (
     <div 
-      className={`flex min-h-screen ${bgColor} overflow-hidden ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
+      className={`flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />

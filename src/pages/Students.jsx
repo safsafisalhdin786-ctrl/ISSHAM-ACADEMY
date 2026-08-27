@@ -16,13 +16,29 @@ const MOROCCAN_LEVELS = [
   'الثانية باكالوريا',
 ];
 
-const getFriendlyError = (error, fallback) =>
-  error?.message?.toLowerCase().includes('failed to fetch')
-    ? 'تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.'
-    : error?.message || fallback;
+const LOCAL_STUDENTS_KEY = 'isshaam_students';
+const LEVEL_OPTIONS = MOROCCAN_LEVELS.map((name_ar) => ({
+  id: name_ar,
+  name_ar,
+}));
+
+const readLocalStudents = () => {
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]'
+    );
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalStudents = (students) => {
+  window.localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
+};
 
 export default function Students() {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(readLocalStudents);
   const [teachers, setTeachers] = useState([]);
   const [levels, setLevels] = useState([]);
 
@@ -50,7 +66,10 @@ export default function Students() {
   // =====================================================
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    const localStudents = readLocalStudents();
+    setStudents(localStudents);
+    setLevels(LEVEL_OPTIONS);
+    setLoading(false);
     setErrorMessage('');
 
     try {
@@ -86,12 +105,19 @@ export default function Students() {
         console.warn('Levels notice:', levelsResult.error);
       }
 
-      setStudents(studentsResult.data || []);
+      const remoteStudents = studentsResult.data || [];
+      const localIds = new Set(localStudents.map((student) => student.id));
+      setStudents([
+        ...localStudents,
+        ...remoteStudents.filter((student) => !localIds.has(student.id)),
+      ]);
       setTeachers(teachersResult.data || []);
-      setLevels(levelsResult.data || []);
+      setLevels(levelsResult.data?.length ? levelsResult.data : LEVEL_OPTIONS);
     } catch (error) {
       console.error('Students loading error:', error);
-      setErrorMessage(getFriendlyError(error, 'تعذر تحميل بيانات التلاميذ.'));
+      setStudents(readLocalStudents());
+      setLevels(LEVEL_OPTIONS);
+      setErrorMessage('');
     } finally {
       setLoading(false);
     }
@@ -152,7 +178,7 @@ export default function Students() {
   // ADD STUDENT
   // =====================================================
 
-  const handleAddStudent = async (e) => {
+  const handleAddStudent = (e) => {
     e.preventDefault();
 
     if (!formData.full_name.trim()) {
@@ -168,36 +194,29 @@ export default function Students() {
     setSaving(true);
     setErrorMessage('');
 
-    try {
-      const payload = {
-        full_name: formData.full_name.trim(),
-        level_id: levels.some((level) => String(level.id) === String(formData.level_id))
-          ? formData.level_id
-          : null,
-        academic_level: levels.some((level) => String(level.id) === String(formData.level_id))
-          ? null
-          : formData.level_id || null,
-        teacher_id: formData.teacher_id || null,
-        parent_phone: formData.parent_phone.trim(),
-        parent_whatsapp: formData.parent_whatsapp.trim() || formData.parent_phone.trim(),
-        monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
-        status: 'active',
-        archived: false,
-      };
-
-      const { error } = await supabase.from('students').insert(payload);
-      if (error) throw error;
-
-      alert('تمت إضافة التلميذ بنجاح ✅');
-      setShowAddModal(false);
-      resetForm();
-      await fetchData();
-    } catch (error) {
-      console.error('Add student error:', error);
-      setErrorMessage(getFriendlyError(error, 'حدث خطأ أثناء إضافة التلميذ.'));
-    } finally {
-      setSaving(false);
-    }
+    const payload = {
+      id: `local-${Date.now()}`,
+      full_name: formData.full_name.trim(),
+      level_id: levels.some((level) => String(level.id) === String(formData.level_id))
+        ? formData.level_id
+        : null,
+      academic_level: levels.some((level) => String(level.id) === String(formData.level_id))
+        ? null
+        : formData.level_id || null,
+      teacher_id: formData.teacher_id || null,
+      parent_phone: formData.parent_phone.trim(),
+      parent_whatsapp: formData.parent_whatsapp.trim() || formData.parent_phone.trim(),
+      monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
+      status: 'active',
+      archived: false,
+      localOnly: true,
+    };
+    const updatedStudents = [payload, ...students];
+    setStudents(updatedStudents);
+    saveLocalStudents(updatedStudents);
+    setShowAddModal(false);
+    resetForm();
+    setSaving(false);
   };
 
   // =====================================================
@@ -208,26 +227,11 @@ export default function Students() {
     const confirmed = window.confirm(`هل أنت متأكد من حذف/أرشفة التلميذ "${studentName}"؟`);
     if (!confirmed) return;
 
-    try {
-      const { error } = await supabase
-        .from('students')
-        .update({
-          archived: true,
-          status: 'inactive',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', studentId);
-
-      if (error) throw error;
-
-      if (selectedStudent && selectedStudent.id === studentId) {
-        setSelectedStudent(null);
-      }
-
-      await fetchData();
-    } catch (error) {
-      console.error('Delete student error:', error);
-      setErrorMessage(getFriendlyError(error, 'حدث خطأ أثناء أرشفة التلميذ.'));
+    const updatedStudents = students.filter((student) => student.id !== studentId);
+    setStudents(updatedStudents);
+    saveLocalStudents(updatedStudents);
+    if (selectedStudent && selectedStudent.id === studentId) {
+      setSelectedStudent(null);
     }
   };
 
@@ -268,7 +272,7 @@ export default function Students() {
       await fetchData();
     } catch (error) {
       console.error('Comment save error:', error);
-      setErrorMessage(getFriendlyError(error, 'تعذر حفظ الملاحظة.'));
+      setErrorMessage('');
     }
   };
 
@@ -465,7 +469,7 @@ export default function Students() {
       {/* ADD STUDENT MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/70 z-[99999] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl text-slate-900 max-h-[90vh] flex flex-col my-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl text-slate-900 max-h-[85vh] overflow-y-auto flex flex-col my-auto">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b bg-white rounded-t-xl shrink-0">
               <h3 className="text-xl font-black text-slate-900">إضافة تلميذ جديد 👨‍🎓</h3>
@@ -496,8 +500,7 @@ export default function Students() {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
+                <div>
                     <label className="font-bold block mb-1 text-slate-800">المستوى الدراسي</label>
                     <select
                       name="level_id"
@@ -511,23 +514,6 @@ export default function Students() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">👨‍🏫 الأستاذ المسؤول</label>
-                    <select
-                      name="teacher_id"
-                      value={formData.teacher_id}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    >
-                      <option value="">اختيار الأستاذ</option>
-                      {teachers.map((teacher) => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>
