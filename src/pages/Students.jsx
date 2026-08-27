@@ -525,14 +525,19 @@ export default function Students() {
       {/* STUDENT PROFILE MODAL */}
 
       {selectedStudent && (
-        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 flex items-center justify-center">
+        <div 
+          className="fixed inset-0 bg-black/70 z-[9999] p-4 flex items-center justify-center overflow-y-auto"
+          style={{ position: 'fixed', top: 0, bottom: 0, left: 0, right: 0 }}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl text-slate-900"
+            style={{ maxHeight: '85vh', overflowY: 'auto', margin: 'auto' }}
+          >
 
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl my-auto max-h-[85vh] overflow-y-auto">
-
-            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-10">
+            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-20">
 
               <div>
-                <h3 className="text-2xl font-black">
+                <h3 className="text-2xl font-black text-slate-900">
                   ملف التلميذ
                 </h3>
 
@@ -545,7 +550,7 @@ export default function Students() {
                 onClick={() =>
                   setSelectedStudent(null)
                 }
-                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-black"
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-black text-slate-700"
               >
                 ✖
               </button>
@@ -554,32 +559,32 @@ export default function Students() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <strong>المستوى:</strong>
-                <p>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <strong className="text-slate-900">المستوى:</strong>
+                <p className="text-slate-800">
                   {getLevelName(selectedStudent)}
                 </p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <strong>القسم:</strong>
-                <p>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <strong className="text-slate-900">القسم:</strong>
+                <p className="text-slate-800">
                   {selectedStudent.classes?.name ||
                     'غير محدد'}
                 </p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <strong>هاتف الولي:</strong>
-                <p>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <strong className="text-slate-900">هاتف الولي:</strong>
+                <p className="text-slate-800">
                   {selectedStudent.parent_phone ||
                     'غير موجود'}
                 </p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <strong>الواجب الشهري:</strong>
-                <p>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <strong className="text-slate-900">الواجب الشهري:</strong>
+                <p className="text-slate-800">
                   {selectedStudent.monthly_fee || 0} درهم
                 </p>
               </div>
@@ -599,9 +604,9 @@ export default function Students() {
 
             </div>
 
-            <div className="mt-5 bg-slate-100 p-4 rounded-xl">
+            <div className="mt-5 bg-slate-100 p-4 rounded-xl border border-slate-200">
 
-              <h4 className="font-black mb-3">
+              <h4 className="font-black text-slate-900 mb-3">
                 ✍️ إضافة ملاحظة بعد الحصة
               </h4>
 
@@ -617,7 +622,7 @@ export default function Students() {
                     setNewComment(e.target.value)
                   }
                   placeholder="اكتب الملاحظة..."
-                  className="flex-1 p-3 border-2 border-slate-300 rounded-lg"
+                  className="flex-1 p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                 />
 
                 <button
@@ -663,11 +668,16 @@ export default function Students() {
       {/* ADD STUDENT MODAL */}
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 flex items-center justify-center">
+        <div 
+          className="fixed inset-0 bg-black/70 z-[9999] p-4 flex items-center justify-center overflow-y-auto"
+          style={{ position: 'fixed', top: 0, bottom: 0, left: 0, right: 0 }}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl text-slate-900"
+            style={{ maxHeight: '85vh', overflowY: 'auto', margin: 'auto' }}
+          >
 
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl my-auto max-h-[85vh] overflow-y-auto">
-
-            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-10">
+            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-20">
               <h3 className="text-xl font-black text-slate-900">
                 إضافة تلميذ جديد 👨‍🎓
               </h3>
@@ -699,7 +709,7 @@ export default function Students() {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -712,7 +722,7 @@ export default function Students() {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -728,7 +738,7 @@ export default function Students() {
                   required
                   value={formData.full_name}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   placeholder="مثال: محمد العلمي"
                 />
               </div>
@@ -744,7 +754,7 @@ export default function Students() {
                     name="level_id"
                     value={formData.level_id}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   >
 
                     <option value="">
@@ -773,7 +783,7 @@ export default function Students() {
                     name="date_of_birth"
                     value={formData.date_of_birth}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -790,7 +800,7 @@ export default function Students() {
                     name="parent_name"
                     value={formData.parent_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -804,7 +814,7 @@ export default function Students() {
                     required
                     value={formData.parent_phone}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                     placeholder="0612345678"
                   />
                 </div>
@@ -822,7 +832,7 @@ export default function Students() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -835,7 +845,7 @@ export default function Students() {
                     name="original_school"
                     value={formData.original_school}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                   />
                 </div>
 
@@ -852,7 +862,7 @@ export default function Students() {
                   name="monthly_fee"
                   value={formData.monthly_fee}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                 />
               </div>
 
@@ -866,11 +876,11 @@ export default function Students() {
                   rows="3"
                   value={formData.notes}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                 />
               </div>
 
-              <div className="flex gap-2 pt-3 border-t sticky bottom-0 bg-white z-10">
+              <div className="flex gap-2 pt-3 border-t sticky bottom-0 bg-white z-20">
 
                 <button
                   type="submit"
