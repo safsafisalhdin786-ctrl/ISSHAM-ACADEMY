@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 
 const SettingsContext = createContext(null);
-const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
 
 const DEFAULT_SETTINGS = {
   branding: {

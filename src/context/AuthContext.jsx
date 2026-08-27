@@ -25,6 +25,17 @@ const ALLOWED_ROLES = {
   TEACHER: 'teacher',
   STUDENT: 'student',
 };
+const DEMO_EMAIL = 'admin@isshaam.com';
+const DEMO_USER = {
+  uid: 'demo-admin',
+  email: DEMO_EMAIL,
+  displayName: 'Demo Administrator',
+  isDemo: true,
+};
+
+const isDemoAuthenticated = () =>
+  typeof window !== 'undefined' &&
+  window.localStorage.getItem('isshaam_demo_auth') === 'true';
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -49,6 +60,14 @@ export const AuthProvider = ({ children }) => {
         // ==========================================
 
         if (!user) {
+          if (isDemoAuthenticated()) {
+            setCurrentUser(DEMO_USER);
+            setUserRole(ALLOWED_ROLES.ADMIN);
+            setUserData(DEMO_USER);
+            setLoading(false);
+            return;
+          }
+
           if (mounted) {
             setCurrentUser(null);
             setUserRole(null);
@@ -228,6 +247,16 @@ export const AuthProvider = ({ children }) => {
       );
     }
 
+    if (normalizedEmail === DEMO_EMAIL) {
+      window.localStorage.setItem('isshaam_demo_auth', 'true');
+      setCurrentUser(DEMO_USER);
+      setUserRole(ALLOWED_ROLES.ADMIN);
+      setUserData(DEMO_USER);
+      setAuthError(null);
+      setLoading(false);
+      return DEMO_USER;
+    }
+
     if (!password) {
       throw new Error(
         'المرجو إدخال كلمة السر.'
@@ -256,6 +285,7 @@ export const AuthProvider = ({ children }) => {
 
       throw error;
     } finally {
+      window.localStorage.removeItem('isshaam_demo_auth');
       setCurrentUser(null);
       setUserRole(null);
       setUserData(null);

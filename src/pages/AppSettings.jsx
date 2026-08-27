@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 
-const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
 
 export default function AppSettings() {
   const {

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 
-const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
 
 export default function Sidebar({ mobileOpen, setMobileOpen }) {
   const { settings } = useSettings();

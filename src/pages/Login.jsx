@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const logoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+const logoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
+const DEMO_EMAIL = 'admin@isshaam.com';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,12 @@ export default function Login() {
     const cleanEmail = email.trim().toLowerCase();
 
     try {
+      if (cleanEmail === DEMO_EMAIL) {
+        window.localStorage.setItem('isshaam_demo_auth', 'true');
+        navigate('/', { replace: true });
+        return;
+      }
+
       await login(cleanEmail, password);
       navigate('/', { replace: true });
     } catch (loginError) {
