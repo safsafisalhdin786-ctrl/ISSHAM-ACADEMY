@@ -21,6 +21,7 @@ import Teachers from './pages/Teachers';
 import Payments from './pages/Payments';
 import Financials from './pages/Financials';
 import AppSettings from './pages/AppSettings';
+import Archive from './pages/Archive';
 
 // Protect the application routes and provide the shared application shell.
 function ProtectedLayout() {
@@ -100,6 +101,7 @@ export default function App() {
               <Route path="payments" element={<Payments />} />
               <Route path="financials" element={<Financials />} />
               <Route path="settings" element={<AppSettings />} />
+              <Route path="archive" element={<Archive />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>

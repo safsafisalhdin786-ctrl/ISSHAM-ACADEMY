@@ -57,6 +57,11 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
       path: '/settings',
       icon: '⚙',
     },
+    {
+      title: isFr ? 'Archives & Historique' : 'الأرشيف والسجلات',
+      path: '/archive',
+      icon: '▤',
+    },
   ];
 
   const handleLinkClick = () => {

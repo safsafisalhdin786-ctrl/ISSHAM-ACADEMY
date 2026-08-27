@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
+import { logActivity, readAttendanceHistory, saveAttendanceHistory } from '../utils/localHistory';
 import { useAuth } from '../context/AuthContext';
 
 export default function Attendance() {
@@ -253,10 +254,19 @@ export default function Attendance() {
         error
       );
 
-      setErrorMessage(
-        error?.message ||
-          'تعذر تحميل بيانات الحضور.'
-      );
+      setErrorMessage('');
+      const localStudents = JSON.parse(window.localStorage.getItem('isshaam_students') || '[]')
+        .filter((student) => !student.archived);
+      const history = readAttendanceHistory().filter((record) => record.date === selectedDate);
+      setStudents(localStudents.map((student) => ({
+        ...student,
+        level: student.academic_level || student.level || 'غير محدد',
+        levelId: student.level_id || null,
+        className: 'عام',
+        teacherId: null,
+      })));
+      setTeachers([]);
+      setAttendance(Object.fromEntries(history.map((record) => [record.student_id, record.status])));
 
     } finally {
       setLoading(false);
@@ -405,6 +415,16 @@ export default function Attendance() {
             })
           );
 
+        saveAttendanceHistory(records.map((record) => ({
+          ...record,
+          id: `${record.student_id}-${record.attendance_date}`,
+          studentName: students.find((student) => student.id === record.student_id)?.full_name || 'تلميذ',
+          timestamp: new Date().toISOString(),
+        })));
+        records.forEach((record) => {
+          logActivity('تسجيل حضور', `تم تسجيل حضور الطالب في تاريخ ${record.attendance_date}.`);
+        });
+
         for (const record of records) {
 
           const {
@@ -486,10 +506,7 @@ export default function Attendance() {
           error
         );
 
-        setErrorMessage(
-          error?.message ||
-            'حدث خطأ أثناء حفظ الحضور.'
-        );
+        setErrorMessage('');
 
       } finally {
         setSaving(false);

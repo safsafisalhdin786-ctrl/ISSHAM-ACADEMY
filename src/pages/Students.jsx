@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
+import { archiveStudent, logActivity } from '../utils/localHistory';
 
 const MOROCCAN_LEVELS = [
   'الأول ابتدائي',
@@ -214,6 +215,7 @@ export default function Students() {
     const updatedStudents = [payload, ...students];
     setStudents(updatedStudents);
     saveLocalStudents(updatedStudents);
+    logActivity('إضافة طالب', `تمت إضافة الطالب ${payload.full_name}.`);
     setShowAddModal(false);
     resetForm();
     setSaving(false);
@@ -230,6 +232,11 @@ export default function Students() {
     const updatedStudents = students.filter((student) => student.id !== studentId);
     setStudents(updatedStudents);
     saveLocalStudents(updatedStudents);
+    archiveStudent(students.find((student) => student.id === studentId) || {
+      id: studentId,
+      full_name: studentName,
+    });
+    logActivity('أرشفة طالب', `تمت أرشفة ملف ${studentName}.`);
     if (selectedStudent && selectedStudent.id === studentId) {
       setSelectedStudent(null);
     }

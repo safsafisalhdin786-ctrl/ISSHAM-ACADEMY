@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { logActivity } from '../utils/localHistory';
 
 export default function Payments() {
   const [students, setStudents] = useState([]);
@@ -31,6 +32,10 @@ export default function Payments() {
       setPayments(loadedPayments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     } catch (e) {
       console.error("خطأ في جلب البيانات:", e);
+      const localStudents = JSON.parse(window.localStorage.getItem('isshaam_students') || '[]');
+      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
+      setStudents(localStudents.filter((student) => !student.archived));
+      setPayments(localPayments);
     } finally {
       setLoading(false);
     }
@@ -66,12 +71,19 @@ export default function Payments() {
       createdAt: serverTimestamp()
     };
 
+    setPrintedReceipt(receiptData);
+    setSelectedStudentId('');
+    setAmountPaid('');
+    setNotes('');
+    const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
+    window.localStorage.setItem('isshaam_payments', JSON.stringify([
+      { ...receiptData, createdAt: new Date().toISOString() },
+      ...localPayments,
+    ]));
+    logActivity('تسجيل أداء', `تم تسجيل أداء بقيمة ${amountPaid} للطالب ${student.fullName}.`);
+
     try {
       await addDoc(collection(db, 'payments'), receiptData);
-      setPrintedReceipt(receiptData);
-      setSelectedStudentId('');
-      setAmountPaid('');
-      setNotes('');
       fetchData();
     } catch (error) {
       console.error("خطأ في تسجيل الأداء:", error);
