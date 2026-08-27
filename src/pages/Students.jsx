@@ -48,19 +48,7 @@ export default function Students() {
       ] = await Promise.all([
         supabase
           .from('students')
-          .select(`
-            *,
-            levels (
-              id,
-              name_ar,
-              name_fr
-            ),
-            classes (
-              id,
-              name,
-              level
-            )
-          `)
+          .select('*')
           .eq('archived', false)
           .order('full_name', { ascending: true }),
 
@@ -97,6 +85,19 @@ export default function Students() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // =====================================================
+  // HELPER TO GET LEVEL NAME
+  // =====================================================
+
+  const getLevelName = (student) => {
+    if (student.levels?.name_ar) return student.levels.name_ar;
+    if (student.level_id && levels.length > 0) {
+      const found = levels.find((l) => l.id === student.level_id);
+      if (found) return found.name_ar;
+    }
+    return student.academic_level || 'المستوى غير محدد';
+  };
 
   // =====================================================
   // FORM
@@ -238,12 +239,6 @@ export default function Students() {
     if (!confirmed) return;
 
     try {
-      /*
-       * ما غاديش نحذفوه نهائياً.
-       * غادي نديروه archived = true
-       * باش ما نضيعوش سجلات الحضور والأداء.
-       */
-
       const { error } = await supabase
         .from('students')
         .update({
@@ -283,11 +278,6 @@ export default function Students() {
     if (!newComment.trim() || !selectedStudent) {
       return;
     }
-
-    /*
-     * بما أن جدول students الحالي ما فيهش sessionLogs
-     * غادي نخزن الملاحظة داخل notes.
-     */
 
     const currentNotes =
       selectedStudent.notes || '';
@@ -339,11 +329,6 @@ export default function Students() {
   // =====================================================
 
   const getTeacherForStudent = (student) => {
-    /*
-     * students table الحالية ما فيهاش teacher_id.
-     * لذلك ما غاديش نخترعو علاقة غير موجودة.
-     */
-
     return null;
   };
 
@@ -462,8 +447,7 @@ export default function Students() {
                   </h3>
 
                   <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-900 rounded-md text-xs font-black">
-                    {student.levels?.name_ar ||
-                      'المستوى غير محدد'}
+                    {getLevelName(student)}
                   </span>
                 </div>
 
@@ -538,9 +522,7 @@ export default function Students() {
         </div>
       )}
 
-      {/* =====================================================
-          STUDENT PROFILE MODAL
-      ===================================================== */}
+      {/* STUDENT PROFILE MODAL */}
 
       {selectedStudent && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
@@ -575,8 +557,7 @@ export default function Students() {
               <div className="bg-slate-50 p-4 rounded-lg">
                 <strong>المستوى:</strong>
                 <p>
-                  {selectedStudent.levels?.name_ar ||
-                    'غير محدد'}
+                  {getLevelName(selectedStudent)}
                 </p>
               </div>
 
@@ -679,9 +660,7 @@ export default function Students() {
         </div>
       )}
 
-      {/* =====================================================
-          ADD STUDENT MODAL
-      ===================================================== */}
+      {/* ADD STUDENT MODAL */}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
