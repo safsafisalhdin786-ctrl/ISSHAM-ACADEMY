@@ -20,13 +20,18 @@ export default function Login() {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    try {
-      if (cleanEmail === DEMO_EMAIL) {
-        window.localStorage.setItem('isshaam_demo_auth', 'true');
-        navigate('/', { replace: true });
-        return;
-      }
+    if (cleanEmail === DEMO_EMAIL) {
+      window.localStorage.setItem(
+        'user',
+        JSON.stringify({ email: DEMO_EMAIL })
+      );
+      window.localStorage.setItem('isshaam_demo_auth', 'true');
+      navigate('/');
+      setLoading(false);
+      return;
+    }
 
+    try {
       await login(cleanEmail, password);
       navigate('/', { replace: true });
     } catch (loginError) {

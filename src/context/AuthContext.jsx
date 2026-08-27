@@ -33,9 +33,22 @@ const DEMO_USER = {
   isDemo: true,
 };
 
-const isDemoAuthenticated = () =>
-  typeof window !== 'undefined' &&
-  window.localStorage.getItem('isshaam_demo_auth') === 'true';
+const isDemoAuthenticated = () => {
+  if (typeof window === 'undefined') return false;
+
+  if (window.localStorage.getItem('isshaam_demo_auth') === 'true') {
+    return true;
+  }
+
+  try {
+    const storedUser = JSON.parse(
+      window.localStorage.getItem('user') || 'null'
+    );
+    return storedUser?.email?.trim().toLowerCase() === DEMO_EMAIL;
+  } catch {
+    return false;
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -286,6 +299,7 @@ export const AuthProvider = ({ children }) => {
       throw error;
     } finally {
       window.localStorage.removeItem('isshaam_demo_auth');
+      window.localStorage.removeItem('user');
       setCurrentUser(null);
       setUserRole(null);
       setUserData(null);
