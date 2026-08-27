@@ -525,11 +525,11 @@ export default function Students() {
       {/* STUDENT PROFILE MODAL */}
 
       {selectedStudent && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 flex items-center justify-center">
 
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl my-auto max-h-[85vh] overflow-y-auto">
 
-            <div className="flex justify-between items-center border-b pb-3 mb-5">
+            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-10">
 
               <div>
                 <h3 className="text-2xl font-black">
@@ -545,7 +545,7 @@ export default function Students() {
                 onClick={() =>
                   setSelectedStudent(null)
                 }
-                className="px-3 py-2 bg-slate-200 rounded-lg font-black"
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-black"
               >
                 ✖
               </button>
@@ -637,7 +637,7 @@ export default function Students() {
                 onClick={() =>
                   sendWhatsApp(selectedStudent)
                 }
-                className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-black"
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-black"
               >
                 📲 تواصل مع الولي
               </button>
@@ -649,7 +649,7 @@ export default function Students() {
                     selectedStudent.full_name
                   )
                 }
-                className="px-5 py-3 bg-red-600 text-white rounded-lg font-black"
+                className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black"
               >
                 🗑️ أرشفة
               </button>
@@ -663,13 +663,25 @@ export default function Students() {
       {/* ADD STUDENT MODAL */}
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 flex items-center justify-center">
 
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl my-auto max-h-[85vh] overflow-y-auto">
 
-            <h3 className="text-xl font-black border-b pb-3 mb-5">
-              إضافة تلميذ جديد 👨‍🎓
-            </h3>
+            <div className="flex justify-between items-center border-b pb-3 mb-5 sticky top-0 bg-white z-10">
+              <h3 className="text-xl font-black text-slate-900">
+                إضافة تلميذ جديد 👨‍🎓
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
+                className="px-3 py-1 bg-slate-200 hover:bg-slate-300 rounded-lg font-black text-slate-700"
+              >
+                ✖
+              </button>
+            </div>
 
             <form
               onSubmit={handleAddStudent}
@@ -679,7 +691,7 @@ export default function Students() {
               <div className="grid md:grid-cols-2 gap-3">
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     الاسم الأول
                   </label>
 
@@ -687,12 +699,12 @@ export default function Students() {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     النسب
                   </label>
 
@@ -700,14 +712,14 @@ export default function Students() {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   />
                 </div>
 
               </div>
 
               <div>
-                <label className="font-bold">
+                <label className="font-bold block mb-1 text-slate-800">
                   الاسم الكامل *
                 </label>
 
@@ -716,7 +728,7 @@ export default function Students() {
                   required
                   value={formData.full_name}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   placeholder="مثال: محمد العلمي"
                 />
               </div>
@@ -724,7 +736,7 @@ export default function Students() {
               <div className="grid md:grid-cols-2 gap-3">
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     المستوى الدراسي
                   </label>
 
@@ -732,7 +744,7 @@ export default function Students() {
                     name="level_id"
                     value={formData.level_id}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg bg-white"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white"
                   >
 
                     <option value="">
@@ -752,7 +764,7 @@ export default function Students() {
                 </div>
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     تاريخ الازدياد
                   </label>
 
@@ -761,7 +773,7 @@ export default function Students() {
                     name="date_of_birth"
                     value={formData.date_of_birth}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white"
                   />
                 </div>
 
@@ -770,7 +782,7 @@ export default function Students() {
               <div className="grid md:grid-cols-2 gap-3">
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     اسم الولي
                   </label>
 
@@ -778,12 +790,12 @@ export default function Students() {
                     name="parent_name"
                     value={formData.parent_name}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     هاتف الولي *
                   </label>
 
@@ -792,7 +804,7 @@ export default function Students() {
                     required
                     value={formData.parent_phone}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                     placeholder="0612345678"
                   />
                 </div>
@@ -802,7 +814,7 @@ export default function Students() {
               <div className="grid md:grid-cols-2 gap-3">
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     هاتف التلميذ
                   </label>
 
@@ -810,12 +822,12 @@ export default function Students() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold">
+                  <label className="font-bold block mb-1 text-slate-800">
                     المدرسة الأصلية
                   </label>
 
@@ -823,14 +835,14 @@ export default function Students() {
                     name="original_school"
                     value={formData.original_school}
                     onChange={handleChange}
-                    className="w-full p-3 border-2 rounded-lg"
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg"
                   />
                 </div>
 
               </div>
 
               <div>
-                <label className="font-bold">
+                <label className="font-bold block mb-1 text-slate-800">
                   الواجب الشهري
                 </label>
 
@@ -840,12 +852,12 @@ export default function Students() {
                   name="monthly_fee"
                   value={formData.monthly_fee}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
                 />
               </div>
 
               <div>
-                <label className="font-bold">
+                <label className="font-bold block mb-1 text-slate-800">
                   📝 ملاحظات
                 </label>
 
@@ -854,11 +866,11 @@ export default function Students() {
                   rows="3"
                   value={formData.notes}
                   onChange={handleChange}
-                  className="w-full p-3 border-2 rounded-lg"
+                  className="w-full p-3 border-2 border-slate-300 rounded-lg"
                 />
               </div>
 
-              <div className="flex gap-2 pt-3 border-t">
+              <div className="flex gap-2 pt-3 border-t sticky bottom-0 bg-white z-10">
 
                 <button
                   type="submit"
@@ -876,7 +888,7 @@ export default function Students() {
                     setShowAddModal(false);
                     resetForm();
                   }}
-                  className="px-5 py-3 bg-slate-200 rounded-lg font-black"
+                  className="px-5 py-3 bg-slate-200 hover:bg-slate-300 rounded-lg font-black text-slate-800"
                 >
                   إلغاء
                 </button>
