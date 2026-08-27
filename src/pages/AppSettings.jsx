@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+
 export default function AppSettings() {
   const {
     settings,
@@ -18,7 +20,7 @@ export default function AppSettings() {
 
   const [branding, setBranding] = useState({
     academyName: 'ISSHAAM ACADEMY',
-    logoUrl: '/logo.jpg',
+    logoUrl: defaultLogoUrl,
     bgColor: 'bg-slate-100',
     primaryColor: '#f59e0b',
     language: 'ar',
@@ -358,7 +360,7 @@ export default function AppSettings() {
 
               <input
                 type="text"
-                placeholder="/logo.jpg أو رابط مباشر"
+                placeholder={`${defaultLogoUrl} أو رابط مباشر`}
                 value={branding.logoUrl}
                 onChange={(e) =>
                   setBranding({
@@ -381,7 +383,7 @@ export default function AppSettings() {
                     src={branding.logoUrl}
                     onError={(e) => {
                       e.currentTarget.src =
-                        '/logo.jpg';
+                        defaultLogoUrl;
                     }}
                     alt="Logo"
                     className="h-12 w-12 object-contain rounded-full border-2 border-amber-400 p-1"

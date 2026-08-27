@@ -14,11 +14,12 @@ import {
 } from 'firebase/firestore';
 
 const SettingsContext = createContext(null);
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
 
 const DEFAULT_SETTINGS = {
   branding: {
     academyName: 'ISSHAAM ACADEMY',
-    logoUrl: '/logo.jpg',
+    logoUrl: defaultLogoUrl,
     bgColor: 'bg-slate-100',
     primaryColor: '#f59e0b',
     language: 'ar',

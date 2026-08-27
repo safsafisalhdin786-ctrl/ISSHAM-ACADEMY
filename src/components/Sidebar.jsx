@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 
+const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+
 export default function Sidebar({ mobileOpen, setMobileOpen }) {
   const { settings } = useSettings();
 
@@ -9,7 +11,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
     settings?.branding?.academyName || 'ISSHAAM ACADEMY';
 
   const logoUrl =
-    settings?.branding?.logoUrl || '/logo.jpg';
+    settings?.branding?.logoUrl || defaultLogoUrl;
 
   const primaryColor =
     settings?.branding?.primaryColor || '#f59e0b';
@@ -67,7 +69,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
     }
 
     event.currentTarget.dataset.fallback = 'true';
-    event.currentTarget.src = '/logo.jpg';
+    event.currentTarget.src = defaultLogoUrl;
   };
 
   return (

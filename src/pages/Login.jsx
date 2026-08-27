@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const logoUrl = `${import.meta.env.BASE_URL}logo.jpg`;
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +41,7 @@ export default function Login() {
         <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
             <img 
-              src="/logo.jpg" 
+              src={logoUrl}
               alt="ISSHAM ACADEMY Logo" 
               className="w-36 h-auto object-contain" 
             />
