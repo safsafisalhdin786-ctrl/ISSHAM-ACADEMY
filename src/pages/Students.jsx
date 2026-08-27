@@ -19,17 +19,14 @@ export default function Students() {
     last_name: '',
     full_name: '',
     level_id: '',
-    class_id: '',
-    parent_name: '',
+    teacher_id: '',
     parent_phone: '',
     parent_whatsapp: '',
-    phone: '',
     original_school: '',
     monthly_fee: '',
     notes: '',
     status: 'active',
     archived: false,
-    date_of_birth: '',
   });
 
   // =====================================================
@@ -48,7 +45,7 @@ export default function Students() {
       ] = await Promise.all([
         supabase
           .from('students')
-          .select('*')
+          .select('*, levels(name_ar), teachers(full_name)')
           .eq('archived', false)
           .order('full_name', { ascending: true }),
 
@@ -87,7 +84,7 @@ export default function Students() {
   }, [fetchData]);
 
   // =====================================================
-  // HELPER TO GET LEVEL NAME
+  // HELPERS FOR LEVEL & TEACHER
   // =====================================================
 
   const getLevelName = (student) => {
@@ -97,6 +94,15 @@ export default function Students() {
       if (found) return found.name_ar;
     }
     return student.academic_level || 'المستوى غير محدد';
+  };
+
+  const getTeacherForStudent = (student) => {
+    if (student.teachers?.full_name) return student.teachers.full_name;
+    if (student.teacher_id && teachers.length > 0) {
+      const found = teachers.find((t) => t.id === student.teacher_id);
+      if (found) return found.full_name;
+    }
+    return 'غير محدد';
   };
 
   // =====================================================
@@ -117,17 +123,14 @@ export default function Students() {
       last_name: '',
       full_name: '',
       level_id: '',
-      class_id: '',
-      parent_name: '',
+      teacher_id: '',
       parent_phone: '',
       parent_whatsapp: '',
-      phone: '',
       original_school: '',
       monthly_fee: '',
       notes: '',
       status: 'active',
       archived: false,
-      date_of_birth: '',
     });
   };
 
@@ -157,17 +160,14 @@ export default function Students() {
         last_name: formData.last_name.trim() || null,
         full_name: formData.full_name.trim(),
         level_id: formData.level_id || null,
-        class_id: formData.class_id || null,
-        parent_name: formData.parent_name.trim() || null,
+        teacher_id: formData.teacher_id || null,
         parent_phone: formData.parent_phone.trim(),
         parent_whatsapp: formData.parent_whatsapp.trim() || formData.parent_phone.trim(),
-        phone: formData.phone.trim() || null,
         original_school: formData.original_school.trim() || null,
         monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
         notes: formData.notes.trim() || null,
         status: 'active',
         archived: false,
-        date_of_birth: formData.date_of_birth || null,
       };
 
       const { error } = await supabase.from('students').insert(payload);
@@ -257,8 +257,6 @@ export default function Students() {
     }
   };
 
-  const getTeacherForStudent = () => null;
-
   const sendWhatsApp = (student) => {
     const phone = student.parent_whatsapp || student.parent_phone;
     if (!phone) {
@@ -319,7 +317,6 @@ export default function Students() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {students.map((student) => {
-            const teacher = getTeacherForStudent(student);
             return (
               <div
                 key={student.id}
@@ -339,7 +336,7 @@ export default function Students() {
                   </p>
                   <p>🏫 المدرسة: {student.original_school || '—'}</p>
                   <p>💰 الواجب الشهري: {student.monthly_fee || 0} درهم</p>
-                  <p>👨‍🏫 الأستاذ: {teacher?.full_name || 'غير محدد'}</p>
+                  <p>👨‍🏫 الأستاذ: {getTeacherForStudent(student)}</p>
                 </div>
 
                 <div className="mt-5 flex gap-2">
@@ -392,8 +389,8 @@ export default function Students() {
                   <p className="text-slate-800">{getLevelName(selectedStudent)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <strong className="text-slate-900 block mb-1">القسم:</strong>
-                  <p className="text-slate-800">{selectedStudent.classes?.name || 'غير محدد'}</p>
+                  <strong className="text-slate-900 block mb-1">الأستاذ المسؤول:</strong>
+                  <p className="text-slate-800">{getTeacherForStudent(selectedStudent)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                   <strong className="text-slate-900 block mb-1">هاتف الولي:</strong>
@@ -523,29 +520,26 @@ export default function Students() {
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold block mb-1 text-slate-800">تاريخ الازدياد</label>
-                    <input
-                      type="date"
-                      name="date_of_birth"
-                      value={formData.date_of_birth}
+                    <label className="font-bold block mb-1 text-slate-800">👨‍🏫 الأستاذ المسؤول</label>
+                    <select
+                      name="teacher_id"
+                      value={formData.teacher_id}
                       onChange={handleChange}
                       className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    />
+                    >
+                      <option value="">اختيار الأستاذ</option>
+                      {teachers.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.full_name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold block mb-1 text-slate-800">اسم الولي</label>
-                    <input
-                      name="parent_name"
-                      value={formData.parent_name}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">هاتف الولي *</label>
+                    <label className="font-bold block mb-1 text-slate-800">هاتف الولي (WhatsApp) *</label>
                     <input
                       name="parent_phone"
                       required
@@ -553,18 +547,6 @@ export default function Students() {
                       onChange={handleChange}
                       className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                       placeholder="0612345678"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">هاتف التلميذ</label>
-                    <input
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                     />
                   </div>
                   <div>
@@ -579,7 +561,7 @@ export default function Students() {
                 </div>
 
                 <div>
-                  <label className="font-bold block mb-1 text-slate-800">الواجب الشهري</label>
+                  <label className="font-bold block mb-1 text-slate-800">الواجب الشهري (درهم)</label>
                   <input
                     type="number"
                     min="0"
