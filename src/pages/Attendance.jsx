@@ -36,7 +36,7 @@ export default function Attendance() {
 
     try {
       // -------------------------------------------------
-      // GET STUDENTS
+      // GET STUDENTS (تم إزالة first_name و last_name من الاستعلام لتفادي الخطأ)
       // -------------------------------------------------
 
       const { data: studentsData, error: studentsError } =
@@ -45,8 +45,6 @@ export default function Attendance() {
           .select(`
             id,
             full_name,
-            first_name,
-            last_name,
             parent_name,
             parent_phone,
             parent_whatsapp,
@@ -411,13 +409,6 @@ export default function Attendance() {
 
             })
           );
-
-        // -------------------------------------------------
-        // IMPORTANT:
-        // We don't use upsert here because the current
-        // database constraint may not match the exact
-        // student/class/date combination.
-        // -------------------------------------------------
 
         for (const record of records) {
 
