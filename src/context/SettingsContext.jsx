@@ -2,7 +2,6 @@ import React, {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 
@@ -190,20 +189,13 @@ export function SettingsProvider({ children }) {
   /**
    * قيمة Context محسوبة بشكل آمن
    */
-  const value = useMemo(
-    () => ({
-      settings,
-      updateSettings,
-      resetLocalSettings,
-      loading,
-      settingsError,
-    }),
-    [
-      settings,
-      loading,
-      settingsError,
-    ]
-  );
+  const value = {
+    settings,
+    updateSettings,
+    resetLocalSettings,
+    loading,
+    settingsError,
+  };
 
   return (
     <SettingsContext.Provider value={value}>

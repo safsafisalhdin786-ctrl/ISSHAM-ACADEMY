@@ -1,6 +1,16 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header({ setMobileOpen }) {
+  const navigate = useNavigate();
+  const { currentUser, userData, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-6 py-3">
       <div className="flex items-center justify-between gap-4">
@@ -71,16 +81,21 @@ export default function Header({ setMobileOpen }) {
           <div className="hidden sm:flex items-center gap-3 pr-2">
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-800">
-                الإدارة
+                {userData?.name || userData?.fullName || currentUser?.email || 'المستخدم'}
               </p>
               <p className="text-xs text-slate-500">
-                Administrateur
+                {userData?.email || currentUser?.email || ''}
               </p>
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold">
-              A
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="تسجيل الخروج"
+              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold hover:bg-rose-100 hover:text-rose-700 transition"
+            >
+              {(userData?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
+            </button>
           </div>
 
         </div>

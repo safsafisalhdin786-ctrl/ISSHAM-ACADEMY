@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -7,37 +8,27 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  // بيانات الدخول الإدارية
-  const DEFAULT_EMAIL = 'admin@isshaam.com';
-  const DEFAULT_PASS = 'Assham2026@Admin';
-
-  const handleLoginSuccess = () => {
-    localStorage.setItem('isshaam_auth', 'true');
-    navigate('/');
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // التحقق المباشر محلياً
-    if (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASS) {
-      handleLoginSuccess();
-    } else {
-      setError('البريد الإلكتروني أو كلمة السر غير صحيحة.');
+    try {
+      await login(cleanEmail, password);
+      navigate('/', { replace: true });
+    } catch (loginError) {
+      setError(
+        loginError?.code === 'auth/invalid-credential'
+          ? 'البريد الإلكتروني أو كلمة السر غير صحيحة.'
+          : 'تعذر تسجيل الدخول. يرجى المحاولة مرة أخرى.'
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const handleQuickLogin = () => {
-    setEmail(DEFAULT_EMAIL);
-    setPassword(DEFAULT_PASS);
-    localStorage.setItem('isshaam_auth', 'true');
-    navigate('/');
   };
 
   return (
@@ -111,15 +102,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <button
-            type="button"
-            onClick={handleQuickLogin}
-            className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg transition border border-slate-300 w-full cursor-pointer"
-          >
-            ⚡ دخول سريع للمدير (Admin)
-          </button>
-        </div>
       </div>
     </div>
   );

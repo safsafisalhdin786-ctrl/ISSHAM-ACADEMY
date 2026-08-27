@@ -9,7 +9,6 @@ import {
   doc, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { useAuth } from '../context/AuthContext';
 
 const SUBJECTS_LIST = [
   'الرياضيات',
@@ -24,9 +23,6 @@ const SUBJECTS_LIST = [
 ];
 
 export default function Teachers() {
-  const auth = useAuth ? useAuth() : null;
-  const userRole = auth?.userRole || 'admin';
-
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);

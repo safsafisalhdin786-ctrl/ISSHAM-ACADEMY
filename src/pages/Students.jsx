@@ -30,7 +30,7 @@ export default function Students() {
   });
 
   // =====================================================
-  // LOAD DATA
+  // LOAD DATA (SAFE FETCH)
   // =====================================================
 
   const fetchData = useCallback(async () => {
@@ -45,7 +45,7 @@ export default function Students() {
       ] = await Promise.all([
         supabase
           .from('students')
-          .select('*, levels(name_ar), teachers(full_name)')
+          .select('*')
           .eq('archived', false)
           .order('full_name', { ascending: true }),
 
@@ -63,8 +63,12 @@ export default function Students() {
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
-      if (teachersResult.error) throw teachersResult.error;
-      if (levelsResult.error) throw levelsResult.error;
+      if (teachersResult.error && teachersResult.error.code !== 'PGRST116') {
+        console.warn('Teachers notice:', teachersResult.error);
+      }
+      if (levelsResult.error && levelsResult.error.code !== 'PGRST116') {
+        console.warn('Levels notice:', levelsResult.error);
+      }
 
       setStudents(studentsResult.data || []);
       setTeachers(teachersResult.data || []);
@@ -90,7 +94,7 @@ export default function Students() {
   const getLevelName = (student) => {
     if (student.levels?.name_ar) return student.levels.name_ar;
     if (student.level_id && levels.length > 0) {
-      const found = levels.find((l) => l.id === student.level_id);
+      const found = levels.find((l) => String(l.id) === String(student.level_id));
       if (found) return found.name_ar;
     }
     return student.academic_level || 'المستوى غير محدد';
@@ -99,7 +103,7 @@ export default function Students() {
   const getTeacherForStudent = (student) => {
     if (student.teachers?.full_name) return student.teachers.full_name;
     if (student.teacher_id && teachers.length > 0) {
-      const found = teachers.find((t) => t.id === student.teacher_id);
+      const found = teachers.find((t) => String(t.id) === String(student.teacher_id));
       if (found) return found.full_name;
     }
     return 'غير محدد';

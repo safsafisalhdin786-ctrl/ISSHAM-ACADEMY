@@ -21,7 +21,7 @@ export default function Dashboard() {
         const [studentsSnap, teachersSnap, attendanceSnap, paymentsSnap] = await Promise.all([
           getDocs(collection(db, 'students')),
           getDocs(collection(db, 'teachers')),
-          getDocs(query(collection(db, 'attendance'), where('date', '==', today), where('status', '==', 'حاضر'))),
+          getDocs(query(collection(db, 'attendance'), where('date', '==', today), where('status', 'in', ['حاضر', 'present']))),
           getDocs(collection(db, 'payments'))
         ]);
 
@@ -35,7 +35,9 @@ export default function Dashboard() {
         paymentsSnap.forEach(doc => {
           const data = doc.data();
           if (data.date) {
-            const pDate = new Date(data.date);
+            const pDate = data.date?.toDate
+              ? data.date.toDate()
+              : new Date(data.date);
             if (pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
               currentMonthRevenue += Number(data.amount || 0);
             }
@@ -84,7 +86,7 @@ export default function Dashboard() {
             تسجيل الحضور اليومي ✅
           </Link>
           <Link
-            to="/financial"
+            to="/financials"
             className="flex-1 md:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-extrabold text-sm shadow-md transition text-center"
           >
             تسجيل الأداءات المالية 💰

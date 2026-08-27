@@ -34,10 +34,6 @@ export default defineConfig({
             '@supabase/supabase-js',
           ],
 
-          firebase: [
-            'firebase',
-          ],
-
           icons: [
             'lucide-react',
           ],

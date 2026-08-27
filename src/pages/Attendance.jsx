@@ -3,12 +3,7 @@ import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 
 export default function Attendance() {
-  const authContext = useAuth ? useAuth() : {};
-
-  const {
-    userRole = 'admin',
-    currentUser = null,
-  } = authContext;
+  const { userRole = 'admin', currentUser = null } = useAuth();
 
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
