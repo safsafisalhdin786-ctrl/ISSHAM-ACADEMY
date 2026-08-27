@@ -17,8 +17,8 @@ import AppSettings from './pages/AppSettings';
 
 // مكوّن لحماية المسارات وتطبيق إعدادات المظهر واللغة الديناميكية
 function ProtectedLayout({ children }) {
-  const { currentUser, loading } = useAuth ? useAuth() : { currentUser: null, loading: false };
-  const { settings } = useSettings ? useSettings() : { settings: {} };
+  const { currentUser, loading } = useAuth();
+  const { settings } = useSettings();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // جلب لون الخلفية واللغة من الإعدادات

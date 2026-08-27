@@ -1,17 +1,55 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+
+    // تحليل حجم الملفات بعد Build
+    visualizer({
+      filename: './dist/stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
+
   build: {
-    chunkSizeWarningLimit: 1600, // رفع الحد الأدنى للتحذير إلى 1600KB
+    target: 'es2020',
+
+    // هذا فقط للتحكم في Warning
+    chunkSizeWarningLimit: 800,
+
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor'; // تجميع مكتبات node_modules في ملف منفصل
-          }
+        manualChunks: {
+          react: [
+            'react',
+            'react-dom',
+            'react-router-dom',
+          ],
+
+          supabase: [
+            '@supabase/supabase-js',
+          ],
+
+          firebase: [
+            'firebase',
+          ],
+
+          icons: [
+            'lucide-react',
+          ],
+
+          documents: [
+            'jspdf',
+            'jspdf-autotable',
+          ],
+
+          excel: [
+            'xlsx',
+          ],
         },
       },
     },

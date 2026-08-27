@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useContext,
   useEffect,
@@ -20,6 +20,12 @@ import {
 
 const AuthContext = createContext(null);
 
+const ALLOWED_ROLES = {
+  ADMIN: 'admin',
+  TEACHER: 'teacher',
+  STUDENT: 'student',
+};
+
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
@@ -29,89 +35,121 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user) => {
-        setLoading(true);
+        if (!mounted) return;
+
         setAuthError(null);
 
+        // ==========================================
+        // NO USER
+        // ==========================================
+
         if (!user) {
-          setCurrentUser(null);
-          setUserRole(null);
-          setUserData(null);
-          setLoading(false);
+          if (mounted) {
+            setCurrentUser(null);
+            setUserRole(null);
+            setUserData(null);
+            setLoading(false);
+          }
           return;
         }
 
-        setCurrentUser(user);
+        if (mounted) {
+          setCurrentUser(user);
+          setLoading(true);
+        }
 
         try {
           const email = user.email
-            ? user.email.toLowerCase().trim()
-            : '';
+            ?.trim()
+            .toLowerCase();
 
           let role = null;
           let data = null;
 
-          // =========================
-          // 1. ADMIN
-          // =========================
+          // ==========================================
+          // 1. ADMIN BY EMAIL
+          // ==========================================
 
           if (email) {
-            const adminByEmail = await getDoc(
-              doc(db, 'admins', email)
+            const adminEmailRef = doc(
+              db,
+              'admins',
+              email
             );
 
-            if (adminByEmail.exists()) {
-              role = 'admin';
-              data = adminByEmail.data();
+            const adminEmailSnapshot = await getDoc(adminEmailRef);
+
+            if (adminEmailSnapshot.exists()) {
+              role = ALLOWED_ROLES.ADMIN;
+              data = adminEmailSnapshot.data();
             }
           }
+
+          // ==========================================
+          // 2. ADMIN BY UID
+          // ==========================================
 
           if (!role) {
-            const adminByUid = await getDoc(
-              doc(db, 'admins', user.uid)
+            const adminUidRef = doc(
+              db,
+              'admins',
+              user.uid
             );
 
-            if (adminByUid.exists()) {
-              role = 'admin';
-              data = adminByUid.data();
+            const adminUidSnapshot = await getDoc(adminUidRef);
+
+            if (adminUidSnapshot.exists()) {
+              role = ALLOWED_ROLES.ADMIN;
+              data = adminUidSnapshot.data();
             }
           }
 
-          // =========================
-          // 2. TEACHER
-          // =========================
+          // ==========================================
+          // 3. TEACHER
+          // ==========================================
 
           if (!role) {
-            const teacherDoc = await getDoc(
-              doc(db, 'teachers', user.uid)
+            const teacherRef = doc(
+              db,
+              'teachers',
+              user.uid
             );
 
-            if (teacherDoc.exists()) {
-              role = 'teacher';
-              data = teacherDoc.data();
+            const teacherSnapshot = await getDoc(teacherRef);
+
+            if (teacherSnapshot.exists()) {
+              role = ALLOWED_ROLES.TEACHER;
+              data = teacherSnapshot.data();
             }
           }
 
-          // =========================
-          // 3. STUDENT
-          // =========================
+          // ==========================================
+          // 4. STUDENT
+          // ==========================================
 
           if (!role) {
-            const studentDoc = await getDoc(
-              doc(db, 'students', user.uid)
+            const studentRef = doc(
+              db,
+              'students',
+              user.uid
             );
 
-            if (studentDoc.exists()) {
-              role = 'student';
-              data = studentDoc.data();
+            const studentSnapshot = await getDoc(studentRef);
+
+            if (studentSnapshot.exists()) {
+              role = ALLOWED_ROLES.STUDENT;
+              data = studentSnapshot.data();
             }
           }
 
-          // =========================
-          // 4. NO ROLE
-          // =========================
+          // ==========================================
+          // INVALID / NO ROLE
+          // ==========================================
 
           if (!role) {
             console.warn(
@@ -119,16 +157,32 @@ export const AuthProvider = ({ children }) => {
               user.uid
             );
 
+            if (!mounted) return;
+
             setUserRole(null);
             setUserData(null);
 
             setAuthError(
               'هذا الحساب مسجل ولكن لا توجد له صلاحية في النظام.'
             );
-          } else {
-            setUserRole(role);
-            setUserData(data);
+
+            return;
           }
+
+          // ==========================================
+          // SUCCESS
+          // ==========================================
+
+          if (!mounted) return;
+
+          setUserRole(role);
+          setUserData({
+            ...data,
+            uid: user.uid,
+            email: user.email || '',
+          });
+
+          setAuthError(null);
 
         } catch (error) {
           console.error(
@@ -136,35 +190,47 @@ export const AuthProvider = ({ children }) => {
             error
           );
 
-          // IMPORTANT:
-          // Never give admin privileges when Firestore fails.
+          if (!mounted) return;
+
           setUserRole(null);
           setUserData(null);
 
           setAuthError(
             'تعذر التحقق من صلاحيات الحساب. يرجى المحاولة مرة أخرى.'
           );
+
         } finally {
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
         }
       }
     );
 
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
-  // =========================
+  // ==========================================
   // LOGIN
-  // =========================
+  // ==========================================
 
   const login = async (email, password) => {
     const normalizedEmail = email
       ?.trim()
       .toLowerCase();
 
-    if (!normalizedEmail || !password) {
+    if (!normalizedEmail) {
       throw new Error(
-        'المرجو إدخال البريد الإلكتروني وكلمة المرور.'
+        'المرجو إدخال البريد الإلكتروني.'
+      );
+    }
+
+    if (!password) {
+      throw new Error(
+        'المرجو إدخال كلمة السر.'
       );
     }
 
@@ -175,18 +241,31 @@ export const AuthProvider = ({ children }) => {
     );
   };
 
-  // =========================
+  // ==========================================
   // LOGOUT
-  // =========================
+  // ==========================================
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error(
+        'خطأ أثناء تسجيل الخروج:',
+        error
+      );
 
-    setCurrentUser(null);
-    setUserRole(null);
-    setUserData(null);
-    setAuthError(null);
+      throw error;
+    } finally {
+      setCurrentUser(null);
+      setUserRole(null);
+      setUserData(null);
+      setAuthError(null);
+    }
   };
+
+  // ==========================================
+  // CONTEXT VALUE
+  // ==========================================
 
   const value = {
     currentUser,
@@ -205,12 +284,16 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// ==========================================
+// HOOK
+// ==========================================
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
     throw new Error(
-      'useAuth must be used inside an AuthProvider'
+      'useAuth must be used inside AuthProvider'
     );
   }
 
