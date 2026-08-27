@@ -87,7 +87,7 @@ export default function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <Router>
+        <Router basename="/ISSHAM-ACADEMY">
           <Routes>
             <Route path="/login" element={<Login />} />
 
