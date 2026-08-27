@@ -1,6 +1,26 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
+const MOROCCAN_LEVELS = [
+  'الأول ابتدائي',
+  'الثاني ابتدائي',
+  'الثالث ابتدائي',
+  'الرابع ابتدائي',
+  'الخامس ابتدائي',
+  'السادس ابتدائي',
+  'الأولى إعدادي',
+  'الثانية إعدادي',
+  'الثالثة إعدادي',
+  'الجذع المشترك',
+  'الأولى باكالوريا',
+  'الثانية باكالوريا',
+];
+
+const getFriendlyError = (error, fallback) =>
+  error?.message?.toLowerCase().includes('failed to fetch')
+    ? 'تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.'
+    : error?.message || fallback;
+
 export default function Students() {
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -15,16 +35,12 @@ export default function Students() {
   const [newComment, setNewComment] = useState('');
 
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
     full_name: '',
     level_id: '',
     teacher_id: '',
     parent_phone: '',
     parent_whatsapp: '',
-    original_school: '',
     monthly_fee: '',
-    notes: '',
     status: 'active',
     archived: false,
   });
@@ -75,9 +91,7 @@ export default function Students() {
       setLevels(levelsResult.data || []);
     } catch (error) {
       console.error('Students loading error:', error);
-      setErrorMessage(
-        error?.message || 'تعذر تحميل بيانات التلاميذ.'
-      );
+      setErrorMessage(getFriendlyError(error, 'تعذر تحميل بيانات التلاميذ.'));
     } finally {
       setLoading(false);
     }
@@ -123,16 +137,12 @@ export default function Students() {
 
   const resetForm = () => {
     setFormData({
-      first_name: '',
-      last_name: '',
       full_name: '',
       level_id: '',
       teacher_id: '',
       parent_phone: '',
       parent_whatsapp: '',
-      original_school: '',
       monthly_fee: '',
-      notes: '',
       status: 'active',
       archived: false,
     });
@@ -160,16 +170,17 @@ export default function Students() {
 
     try {
       const payload = {
-        first_name: formData.first_name.trim() || null,
-        last_name: formData.last_name.trim() || null,
         full_name: formData.full_name.trim(),
-        level_id: formData.level_id || null,
+        level_id: levels.some((level) => String(level.id) === String(formData.level_id))
+          ? formData.level_id
+          : null,
+        academic_level: levels.some((level) => String(level.id) === String(formData.level_id))
+          ? null
+          : formData.level_id || null,
         teacher_id: formData.teacher_id || null,
         parent_phone: formData.parent_phone.trim(),
         parent_whatsapp: formData.parent_whatsapp.trim() || formData.parent_phone.trim(),
-        original_school: formData.original_school.trim() || null,
         monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
-        notes: formData.notes.trim() || null,
         status: 'active',
         archived: false,
       };
@@ -183,7 +194,7 @@ export default function Students() {
       await fetchData();
     } catch (error) {
       console.error('Add student error:', error);
-      setErrorMessage(error?.message || 'حدث خطأ أثناء إضافة التلميذ.');
+      setErrorMessage(getFriendlyError(error, 'حدث خطأ أثناء إضافة التلميذ.'));
     } finally {
       setSaving(false);
     }
@@ -216,7 +227,7 @@ export default function Students() {
       await fetchData();
     } catch (error) {
       console.error('Delete student error:', error);
-      setErrorMessage(error?.message || 'حدث خطأ أثناء أرشفة التلميذ.');
+      setErrorMessage(getFriendlyError(error, 'حدث خطأ أثناء أرشفة التلميذ.'));
     }
   };
 
@@ -257,7 +268,7 @@ export default function Students() {
       await fetchData();
     } catch (error) {
       console.error('Comment save error:', error);
-      setErrorMessage(error?.message || 'تعذر حفظ الملاحظة.');
+      setErrorMessage(getFriendlyError(error, 'تعذر حفظ الملاحظة.'));
     }
   };
 
@@ -290,9 +301,9 @@ export default function Students() {
   }
 
   return (
-    <div className="space-y-6 dir-rtl text-right pb-10">
+    <div className="mx-auto w-full max-w-7xl space-y-6 dir-rtl text-right pb-10">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl shadow-md border border-slate-300">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
           <h2 className="text-2xl font-black text-slate-900">إدارة ملفات التلاميذ 👥</h2>
           <p className="text-sm font-bold text-slate-600">
@@ -301,7 +312,7 @@ export default function Students() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-black shadow-md"
+          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-600/20 transition"
         >
           ➕ إضافة تلميذ جديد
         </button>
@@ -324,7 +335,7 @@ export default function Students() {
             return (
               <div
                 key={student.id}
-                className="bg-white rounded-xl shadow-md border border-slate-300 p-5 border-t-4 border-t-blue-600"
+                className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 border-t-4 border-t-indigo-500 hover:-translate-y-0.5 hover:shadow-lg transition"
               >
                 <div className="border-b pb-3">
                   <h3 className="text-xl font-black text-slate-900">{student.full_name}</h3>
@@ -473,27 +484,6 @@ export default function Students() {
             {/* Modal Body - Scrollable */}
             <form onSubmit={handleAddStudent} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">الاسم الأول</label>
-                    <input
-                      name="first_name"
-                      value={formData.first_name}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">النسب</label>
-                    <input
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="font-bold block mb-1 text-slate-800">الاسم الكامل *</label>
                   <input
@@ -516,10 +506,8 @@ export default function Students() {
                       className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
                     >
                       <option value="">اختيار المستوى</option>
-                      {levels.map((level) => (
-                        <option key={level.id} value={level.id}>
-                          {level.name_ar}
-                        </option>
+                      {(levels.length ? levels : MOROCCAN_LEVELS.map((name_ar) => ({ id: name_ar, name_ar }))).map((level) => (
+                        <option key={level.id} value={level.id}>{level.name_ar}</option>
                       ))}
                     </select>
                   </div>
@@ -553,15 +541,6 @@ export default function Students() {
                       placeholder="0612345678"
                     />
                   </div>
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-800">المدرسة الأصلية</label>
-                    <input
-                      name="original_school"
-                      value={formData.original_school}
-                      onChange={handleChange}
-                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -576,16 +555,6 @@ export default function Students() {
                   />
                 </div>
 
-                <div>
-                  <label className="font-bold block mb-1 text-slate-800">📝 ملاحظات</label>
-                  <textarea
-                    name="notes"
-                    rows="3"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                  />
-                </div>
               </div>
 
               {/* Modal Footer - Fixed Bottom Buttons */}

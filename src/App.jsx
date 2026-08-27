@@ -68,12 +68,12 @@ function ProtectedLayout() {
 
   return (
     <div 
-      className={`flex h-screen ${bgColor} overflow-hidden ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
+      className={`flex min-h-screen ${bgColor} overflow-hidden ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-hidden">
         <Header setMobileOpen={setMobileOpen} />
         <main className={`flex-1 overflow-y-auto overflow-x-auto p-3 sm:p-4 md:p-6 ${bgColor}`}>
           <Outlet />
