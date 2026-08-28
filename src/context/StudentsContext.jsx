@@ -1,16 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-
-const STUDENTS_KEY = 'isshaam_students';
-const STUDENTS_EVENT = 'isshaam:students-updated';
-
-const readStudents = () => {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(STUDENTS_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-};
+import { supabase } from '../supabase';
 
 export const normalizeStudent = (student) => ({
   ...student,
@@ -27,29 +16,42 @@ export const normalizeStudent = (student) => ({
 const StudentsContext = createContext(null);
 
 export function StudentsProvider({ children }) {
-  const [students, setStudentsState] = useState(() => readStudents().map(normalizeStudent));
+  const [students, setStudentsState] = useState([]);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const setStudents = useCallback((next) => {
     setStudentsState((current) => {
       const value = typeof next === 'function' ? next(current) : next;
-      const normalized = value.map(normalizeStudent);
-      window.localStorage.setItem(STUDENTS_KEY, JSON.stringify(normalized));
-      window.dispatchEvent(new Event(STUDENTS_EVENT));
-      return normalized;
+      return value.map(normalizeStudent);
     });
   }, []);
 
   useEffect(() => {
-    const sync = () => setStudentsState(readStudents().map(normalizeStudent));
-    window.addEventListener(STUDENTS_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener(STUDENTS_EVENT, sync);
-      window.removeEventListener('storage', sync);
+    let active = true;
+    const loadStudents = async () => {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('archived', false)
+        .order('full_name', { ascending: true });
+      if (error) {
+        console.error('Central students loading error:', error);
+        return;
+      }
+      if (active) setStudentsState((data || []).map(normalizeStudent));
     };
-  }, []);
+    void loadStudents();
+    const channel = supabase
+      .channel('academy-students-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => setRefreshToken((token) => token + 1))
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshToken]);
 
-  const value = useMemo(() => ({ students, setStudents, refreshStudents: () => setStudentsState(readStudents().map(normalizeStudent)) }), [students, setStudents]);
+  const value = useMemo(() => ({ students, setStudents, refreshStudents: () => setRefreshToken((token) => token + 1) }), [students, setStudents]);
   return <StudentsContext.Provider value={value}>{children}</StudentsContext.Provider>;
 }
 

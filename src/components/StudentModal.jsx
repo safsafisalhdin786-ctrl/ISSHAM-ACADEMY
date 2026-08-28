@@ -1,12 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { db } from '../firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-} from 'firebase/firestore';
-import { readAttendanceHistory } from '../utils/localHistory';
+import { supabase } from '../supabase';
 
 export default function StudentProfileModal({ student, onClose }) {
   const [activeTab, setActiveTab] = useState('info');
@@ -30,32 +23,14 @@ export default function StudentProfileModal({ student, onClose }) {
       setError('');
 
       try {
-        const attendanceQuery = query(
-          collection(db, 'attendance'),
-          where('studentId', '==', student.id)
-        );
-
-        const paymentsQuery = query(
-          collection(db, 'payments'),
-          where('studentId', '==', student.id)
-        );
-
-        const [attendanceSnapshot, paymentsSnapshot] = await Promise.all([
-          getDocs(attendanceQuery),
-          getDocs(paymentsQuery),
+        const [{ data: attendance, error: attendanceError }, { data: payments, error: paymentsError }] = await Promise.all([
+          supabase.from('attendance').select('*').eq('student_id', student.id),
+          supabase.from('payments').select('*').eq('student_id', student.id),
         ]);
+        if (attendanceError) throw attendanceError;
+        if (paymentsError) throw paymentsError;
 
         if (cancelled) return;
-
-        const attendance = attendanceSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        const payments = paymentsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
 
         const getRecordDate = (record) => {
           const value =
@@ -92,16 +67,9 @@ export default function StudentProfileModal({ student, onClose }) {
         );
 
         if (!cancelled) {
-          setAttendanceRecords(
-            readAttendanceHistory().filter(
-              (record) => record.student_id === student.id
-            )
-          );
-          setPaymentRecords(
-            JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]')
-              .filter((record) => record.studentId === student.id)
-          );
-          setError('');
+          setAttendanceRecords([]);
+          setPaymentRecords([]);
+          setError(`تعذر تحميل سجلات التلميذ من قاعدة البيانات: ${err.message || 'خطأ غير معروف'}`);
         }
       } finally {
         if (!cancelled) {

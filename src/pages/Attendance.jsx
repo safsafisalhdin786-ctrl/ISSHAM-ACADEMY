@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
-import { logActivity, readAttendanceHistory, saveAttendanceHistory } from '../utils/localHistory';
 import { useAuth } from '../context/AuthContext';
 import { useStudents } from '../context/StudentsContext';
 
@@ -47,6 +46,7 @@ export default function Attendance() {
             parent_whatsapp,
             level_id,
             class_id,
+            teacher_id,
             status,
             archived
           `)
@@ -256,19 +256,7 @@ export default function Attendance() {
         error
       );
 
-      setErrorMessage('');
-      const localStudents = JSON.parse(window.localStorage.getItem('isshaam_students') || '[]')
-        .filter((student) => !student.archived);
-      const history = readAttendanceHistory().filter((record) => record.date === selectedDate);
-      setStudents(localStudents.map((student) => ({
-        ...student,
-        level: student.academic_level || student.level || 'غير محدد',
-        levelId: student.level_id || null,
-        className: 'عام',
-        teacherId: student.teacher_id || student.teacherId || null,
-      })));
-      setTeachers([]);
-      setAttendance(Object.fromEntries(history.map((record) => [record.student_id, record.status])));
+      setErrorMessage(`تعذر تحميل بيانات الحضور المركزية: ${error.message || 'خطأ غير معروف'}`);
 
     } finally {
       setLoading(false);
@@ -416,21 +404,6 @@ export default function Attendance() {
 
             })
           );
-
-        saveAttendanceHistory(records.map((record) => ({
-          ...record,
-          id: `${record.student_id}-${record.attendance_date}`,
-          studentName: students.find((student) => student.id === record.student_id)?.full_name || 'تلميذ',
-          timestamp: new Date().toISOString(),
-        })));
-        records.forEach((record) => {
-          logActivity('attendance_saved', {
-            message: `تم تسجيل حضور الطالب في تاريخ ${record.attendance_date}.`,
-            studentId: record.student_id,
-            date: record.attendance_date,
-            status: record.status,
-          });
-        });
 
         for (const record of records) {
 

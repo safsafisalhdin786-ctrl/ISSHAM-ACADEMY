@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -15,21 +15,10 @@ import {
   UserRoundCheck,
   UserRoundX,
 } from 'lucide-react';
-import { db } from '../firebase';
 import { useStudents } from '../context/StudentsContext';
-import { readActivityLog, readAttendanceHistory } from '../utils/localHistory';
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const monthKey = () => new Date().toISOString().slice(0, 7);
-
-const readLocalArray = (key) => {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(key) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-};
 
 const isPresent = (status) => ['حاضر', 'present'].includes(String(status).toLowerCase());
 const isLate = (status) => ['متأخر', 'late'].includes(String(status).toLowerCase());
@@ -84,69 +73,60 @@ function Section({ title, icon: Icon, children, action }) {
 export default function Dashboard() {
   const { students } = useStudents();
   const [remote, setRemote] = useState({ teachers: 0, attendance: [], payments: [] });
-  const [activities, setActivities] = useState(() => readActivityLog().slice(0, 5));
+  const activities = [];
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
         const today = todayKey();
-        const [teachersSnap, attendanceSnap, paymentsSnap] = await Promise.all([
-          getDocs(collection(db, 'teachers')),
-          getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
-          getDocs(collection(db, 'payments')),
+        const [{ data: teachers, error: teachersError }, { data: attendance, error: attendanceError }, { data: payments, error: paymentsError }] = await Promise.all([
+          supabase.from('teachers').select('id'),
+          supabase.from('attendance').select('*').or(`date.eq.${today},attendance_date.eq.${today}`),
+          supabase.from('payments').select('*'),
         ]);
+        if (teachersError) throw teachersError;
+        if (attendanceError) throw attendanceError;
+        if (paymentsError) throw paymentsError;
         if (mounted) {
           setRemote({
-            teachers: teachersSnap.size,
-            attendance: attendanceSnap.docs.map((item) => item.data()),
-            payments: paymentsSnap.docs.map((item) => item.data()),
+            teachers: (teachers || []).length,
+            attendance: attendance || [],
+            payments: payments || [],
           });
         }
       } catch (error) {
-        console.warn('تعذر تحميل بعض بيانات لوحة التحكم، سيتم استعمال البيانات المحلية.', error);
+        console.error('تعذر تحميل بيانات لوحة التحكم المركزية.', error);
       }
     };
     load();
 
-    const refreshActivities = () => setActivities(readActivityLog().slice(0, 5));
     const refreshData = () => load();
-    window.addEventListener('storage', refreshActivities);
-    window.addEventListener('isshaam:activity-updated', refreshActivities);
     window.addEventListener('isshaam:students-updated', refreshData);
     window.addEventListener('isshaam:payments-updated', refreshData);
     window.addEventListener('isshaam:attendance-updated', refreshData);
+    const channel = supabase
+      .channel('academy-dashboard-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, refreshData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teachers' }, refreshData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, refreshData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, refreshData)
+      .subscribe();
     return () => {
       mounted = false;
-      window.removeEventListener('storage', refreshActivities);
-      window.removeEventListener('isshaam:activity-updated', refreshActivities);
       window.removeEventListener('isshaam:students-updated', refreshData);
       window.removeEventListener('isshaam:payments-updated', refreshData);
       window.removeEventListener('isshaam:attendance-updated', refreshData);
+      void supabase.removeChannel(channel);
     };
   }, []);
 
   const metrics = useMemo(() => {
-    const localAttendance = readAttendanceHistory();
-    const localPayments = readLocalArray('isshaam_payments');
     const activeStudents = students.filter((student) => !student.archived);
-    const attendance = [
-      ...remote.attendance,
-      ...localAttendance.filter((item) => item.date === todayKey()),
-    ].filter((record, index, records) => (
-      records.findIndex((candidate) => (
-        (candidate.id && candidate.id === record.id)
-        || (candidate.student_id === record.student_id && (candidate.date || candidate.attendance_date) === (record.date || record.attendance_date))
-      )) === index
-    ));
-    const payments = [
-      ...remote.payments,
-      ...localPayments,
-    ].filter((payment, index, records) => (
-      !payment.id || records.findIndex((candidate) => candidate.id === payment.id) === index
-    ));
+    const attendance = remote.attendance;
+    const payments = remote.payments;
     const currentPayments = payments.filter((payment) => {
-      const date = payment.date || payment.createdAt || '';
+      const date = payment.date || payment.created_at || payment.createdAt || '';
       return String(date).slice(0, 7) === monthKey();
     });
     const present = attendance.filter((item) => isPresent(item.status)).length;

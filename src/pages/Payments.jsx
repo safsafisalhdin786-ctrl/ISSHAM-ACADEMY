@@ -1,7 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { logActivity } from '../utils/localHistory';
+import { supabase } from '../supabase';
 import { useStudents } from '../context/StudentsContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -23,15 +21,14 @@ export default function Payments() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [studentsSnap, paymentsSnap] = await Promise.all([
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'payments'))
+      const [{ data: loadedStudentsData, error: studentsError }, { data: loadedPaymentsData, error: paymentsError }] = await Promise.all([
+        supabase.from('students').select('*').eq('archived', false),
+        supabase.from('payments').select('*').order('created_at', { ascending: false }),
       ]);
-
-      const loadedStudents = studentsSnap.docs.map(d => {
-        const data = d.data();
+      if (studentsError) throw studentsError;
+      if (paymentsError) throw paymentsError;
+      const loadedStudents = (loadedStudentsData || []).map(data => {
         return {
-          id: d.id,
           ...data,
           fullName: data.fullName || data.full_name || '',
           parentPhone: data.parentPhone || data.parent_phone || '',
@@ -44,18 +41,29 @@ export default function Payments() {
         return [...current, ...loadedStudents.filter((student) => !localIds.has(student.id))];
       });
 
-      const loadedPayments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPayments(loadedPayments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      setPayments((loadedPaymentsData || []).map((payment) => ({
+        ...payment,
+        studentId: payment.student_id || payment.studentId,
+        studentName: payment.student_name || payment.studentName,
+        parentPhone: payment.parent_phone || payment.parentPhone,
+        createdAt: payment.created_at || payment.createdAt,
+      })));
     } catch (e) {
       console.error("خطأ في جلب البيانات:", e);
-      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-      setPayments(localPayments);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
   }, [setStudents]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    void fetchData();
+    const channel = supabase
+      .channel('academy-payments-page-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => void fetchData())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [fetchData]);
 
   const handleStudentSelect = (e) => {
     const sId = e.target.value;
@@ -84,41 +92,43 @@ export default function Payments() {
       notes: notes,
       date: new Date().toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' }),
       time: new Date().toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' }),
-      createdAt: serverTimestamp()
+      createdAt: new Date().toISOString(),
     };
 
     setPrintedReceipt(receiptData);
     setSelectedStudentId('');
     setAmountPaid('');
     setNotes('');
-    const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-    window.localStorage.setItem('isshaam_payments', JSON.stringify([
-      { ...receiptData, createdAt: new Date().toISOString() },
-      ...localPayments,
-    ]));
-    window.dispatchEvent(new Event('isshaam:payments-updated'));
-    setStudents((current) => current.map((item) => (
-      item.id === student.id ? { ...item, paymentStatus: 'paid' } : item
-    )));
-    logActivity('payment_created', {
-      message: `تم تسجيل أداء بقيمة ${amountPaid} للطالب ${student.fullName}.`,
-      studentName: student.fullName,
-      studentId: student.id,
-      amount: amountPaid,
-    });
-
     try {
-      await addDoc(collection(db, 'payments'), receiptData);
-      fetchData();
+      const { data, error } = await supabase.from('payments').insert({
+        receipt_no: receiptData.receiptNo,
+        student_id: receiptData.studentId,
+        student_name: receiptData.studentName,
+        parent_phone: receiptData.parentPhone,
+        level: receiptData.level,
+        amount: Number(receiptData.amount),
+        month: receiptData.month,
+        notes: receiptData.notes,
+        date: new Date().toISOString(),
+        status: 'paid',
+      }).select().single();
+      if (error) throw error;
+      setPayments((current) => [{ ...receiptData, ...data, id: data.id }, ...current]);
+      setStudents((current) => current.map((item) => (
+        item.id === student.id ? { ...item, paymentStatus: 'paid' } : item
+      )));
     } catch (error) {
       console.error("خطأ في تسجيل الأداء:", error);
+      setPrintedReceipt(null);
+      alert(`تعذر حفظ الأداء في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
   // حذف وصل/عملية أداء من Firestore (سلة المهملات)
   const handleDeletePayment = async (paymentId) => {
       try {
-        await deleteDoc(doc(db, 'payments', paymentId));
+        const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+        if (error) throw error;
         setPayments(prev => prev.filter(p => p.id !== paymentId));
       } catch (error) {
         console.error("خطأ أثناء حذف الوصل:", error);

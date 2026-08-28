@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '../firebase';
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  doc,
-  serverTimestamp
-} from 'firebase/firestore';
+import { supabase } from '../supabase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 
@@ -45,15 +35,15 @@ export default function Teachers() {
     salary: ''
   });
 
-  // جلب البيانات من Firestore
+  // جلب البيانات من قاعدة الأكاديمية المركزية
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const teachersSnap = await getDocs(collection(db, 'teachers'));
-      const teachersList = teachersSnap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        displayName: d.data().fullName || d.data().full_name || d.data().name || 'أستاذ غير مسمى'
+      const { data, error } = await supabase.from('teachers').select('*').order('full_name', { ascending: true });
+      if (error) throw error;
+      const teachersList = (data || []).map((teacher) => ({
+        ...teacher,
+        displayName: teacher.full_name || teacher.fullName || teacher.name || 'أستاذ غير مسمى',
       }));
       setTeachers(teachersList);
     } catch (error) {
@@ -73,22 +63,22 @@ export default function Teachers() {
     setSaving(true);
     try {
       const payload = {
-        fullName: form.fullName.trim(),
+        full_name: form.fullName.trim(),
         name: form.fullName.trim(),
         subject: form.subject,
         phone: form.phone.trim(),
         salary: form.salary ? Number(form.salary) : 0,
-        updatedAt: serverTimestamp()
+        updated_at: new Date().toISOString(),
+        status: 'active',
       };
 
       if (editingId) {
-        await updateDoc(doc(db, 'teachers', editingId), payload);
+        const { error } = await supabase.from('teachers').update(payload).eq('id', editingId);
+        if (error) throw error;
         setEditingId(null);
       } else {
-        await addDoc(collection(db, 'teachers'), {
-          ...payload,
-          createdAt: serverTimestamp()
-        });
+        const { error } = await supabase.from('teachers').insert(payload);
+        if (error) throw error;
       }
 
       setForm({ fullName: '', subject: 'الرياضيات', phone: '', salary: '' });
@@ -123,22 +113,11 @@ export default function Teachers() {
     if (!deleteModal.id) return;
     setDeleting(true);
     try {
-      const [legacyStudents, relationalStudents] = await Promise.all([
-        getDocs(query(collection(db, 'students'), where('teacherId', '==', deleteModal.id))),
-        getDocs(query(collection(db, 'students'), where('teacher_id', '==', deleteModal.id))),
-      ]);
-      if (legacyStudents.size > 0 || relationalStudents.size > 0) {
-        await updateDoc(doc(db, 'teachers', deleteModal.id), {
-          status: 'inactive',
-          updatedAt: serverTimestamp(),
-        });
-        alert('تم تعطيل الأستاذ بدلاً من حذفه لأنه مرتبط بتلاميذ محفوظين.');
-      } else {
-        await updateDoc(doc(db, 'teachers', deleteModal.id), {
-          status: 'inactive',
-          updatedAt: serverTimestamp(),
-        });
-      }
+      const { error } = await supabase.from('teachers').update({
+        status: 'inactive',
+        updated_at: new Date().toISOString(),
+      }).eq('id', deleteModal.id);
+      if (error) throw error;
       setDeleteModal({ show: false, id: null, name: '' });
       fetchData();
     } catch (error) {

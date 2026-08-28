@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
-import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
-import { archiveStudent, logActivity, undoArchiveStudent } from '../utils/localHistory';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import { useStudents } from '../context/StudentsContext';
@@ -22,26 +19,10 @@ const MOROCCAN_LEVELS = [
   'الثانية باكالوريا',
 ];
 
-const LOCAL_STUDENTS_KEY = 'isshaam_students';
 const LEVEL_OPTIONS = MOROCCAN_LEVELS.map((name_ar) => ({
   id: name_ar,
   name_ar,
 }));
-
-const readLocalStudents = () => {
-  try {
-    const stored = JSON.parse(
-      window.localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]'
-    );
-    return Array.isArray(stored) ? stored : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveLocalStudents = (students) => {
-  window.localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
-};
 
 export default function Students() {
   const { students, setStudents } = useStudents();
@@ -57,7 +38,6 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [newComment, setNewComment] = useState('');
   const [pendingArchive, setPendingArchive] = useState(null);
-  const [undoItem, setUndoItem] = useState(null);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -75,18 +55,11 @@ export default function Students() {
   // =====================================================
 
   const fetchData = useCallback(async () => {
-    const localStudents = readLocalStudents();
-    setStudents(localStudents);
     setLevels(LEVEL_OPTIONS);
-    setLoading(false);
     setErrorMessage('');
 
     try {
-      const [
-        studentsResult,
-        teachersResult,
-        levelsResult,
-      ] = await Promise.all([
+      const [studentsResult, teachersResult, levelsResult] = await Promise.all([
         supabase
           .from('students')
           .select('*')
@@ -106,41 +79,26 @@ export default function Students() {
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
-      let loadedTeachers = teachersResult.data || [];
+
+      setStudents(studentsResult.data || []);
+      const notices = [];
       if (teachersResult.error) {
-        console.warn('Supabase teachers unavailable; trying Firestore.', teachersResult.error);
-        const teachersSnapshot = await getDocs(collection(db, 'teachers'));
-        loadedTeachers = teachersSnapshot.docs.map((teacherDoc) => ({
-          id: teacherDoc.id,
-          ...teacherDoc.data(),
-        }));
+        setTeachers([]);
+        notices.push(`تعذر تحميل قائمة الأساتذة: ${teachersResult.error.message || 'خطأ غير معروف'}`);
+      } else {
+        setTeachers((teachersResult.data || []).filter((teacher) => teacher.status !== 'inactive'));
       }
       if (levelsResult.error && levelsResult.error.code !== 'PGRST116') {
-        console.warn('Levels notice:', levelsResult.error);
+        setLevels(LEVEL_OPTIONS);
+        notices.push(`تعذر تحميل المستويات: ${levelsResult.error.message || 'خطأ غير معروف'}`);
+      } else {
+        setLevels(levelsResult.data?.length ? levelsResult.data : LEVEL_OPTIONS);
       }
-
-      const remoteStudents = studentsResult.data || [];
-      const localIds = new Set(localStudents.map((student) => student.id));
-      setStudents([
-        ...localStudents,
-        ...remoteStudents.filter((student) => !localIds.has(student.id)),
-      ]);
-      setTeachers(loadedTeachers.filter((teacher) => teacher.status !== 'inactive'));
-      setLevels(levelsResult.data?.length ? levelsResult.data : LEVEL_OPTIONS);
+      setErrorMessage(notices.join(' '));
     } catch (error) {
       console.error('Students loading error:', error);
-      setStudents(readLocalStudents());
-      setLevels(LEVEL_OPTIONS);
-      try {
-        const teachersSnapshot = await getDocs(collection(db, 'teachers'));
-        setTeachers(teachersSnapshot.docs
-          .map((teacherDoc) => ({ id: teacherDoc.id, ...teacherDoc.data() }))
-          .filter((teacher) => teacher.status !== 'inactive'));
-      } catch (teacherError) {
-        console.error('Teachers loading error:', teacherError);
-        setTeachers([]);
-        setErrorMessage('تعذر تحميل قائمة الأساتذة من قاعدة البيانات. يرجى المحاولة مرة أخرى.');
-      }
+      setTeachers([]);
+      setErrorMessage(`تعذر تحميل بيانات التلاميذ من قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setLoading(false);
     }
@@ -229,7 +187,6 @@ export default function Students() {
     setErrorMessage('');
 
     const payload = {
-      id: editingStudentId || `local-${Date.now()}`,
       full_name: formData.full_name.trim(),
       level_id: levels.some((level) => String(level.id) === String(formData.level_id))
         ? formData.level_id
@@ -243,21 +200,8 @@ export default function Students() {
       monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
       status: 'active',
       archived: false,
-      localOnly: true,
     };
     const teacher = teachers.find((item) => String(item.id) === String(payload.teacher_id));
-    const payloadWithTeacher = {
-      ...payload,
-      teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '',
-    };
-    const updatedStudents = editingStudentId
-      ? students.map((student) => (student.id === editingStudentId ? { ...student, ...payloadWithTeacher } : student))
-      : [payloadWithTeacher, ...students];
-    setStudents(updatedStudents);
-    saveLocalStudents(updatedStudents);
-    logActivity(editingStudentId ? 'تعديل طالب' : 'إضافة طالب', `${editingStudentId ? 'تم تعديل' : 'تمت إضافة'} الطالب ${payload.full_name}.`);
-
-    // Keep local-first UX while synchronizing to Supabase when configured.
     try {
       const studentFields = {
         full_name: payload.full_name,
@@ -274,18 +218,21 @@ export default function Students() {
         : await supabase.from('students').insert(studentFields).select('*').single();
       const { data, error } = result;
       if (error) throw error;
-      if (data?.id) {
-        setStudents((current) => editingStudentId
-          ? current.map((student) => (student.id === editingStudentId ? { ...data, teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '', localOnly: false } : student))
-          : current.map((student) => (student.id === payload.id ? { ...data, teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '', localOnly: false } : student)));
-      }
-    } catch (error) {
-      console.error('Student teacher relationship save failed:', error);
-      setErrorMessage('تعذر حفظ علاقة الأستاذ بالتلميذ في قاعدة البيانات. تم الاحتفاظ بالبيانات محلياً، يرجى المحاولة مرة أخرى.');
-    } finally {
-      setSaving(false);
+      if (!data?.id) throw new Error('لم تُرجع قاعدة البيانات معرف التلميذ بعد الحفظ.');
+      const savedStudent = {
+        ...data,
+        teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '',
+      };
+      setStudents((current) => editingStudentId
+        ? current.map((student) => (student.id === editingStudentId ? savedStudent : student))
+        : [savedStudent, ...current]);
       setShowAddModal(false);
       resetForm();
+    } catch (error) {
+      console.error('Student teacher relationship save failed:', error);
+      setErrorMessage(`تعذر حفظ التلميذ وعلاقة الأستاذ في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -309,23 +256,20 @@ export default function Students() {
   // DELETE / ARCHIVE STUDENT
   // =====================================================
 
-  const handleDeleteStudent = async (studentId, studentName) => {
-    const student = students.find((item) => item.id === studentId) || { id: studentId, full_name: studentName };
-    const updatedStudents = students.filter((student) => student.id !== studentId);
-    setStudents(updatedStudents);
-    saveLocalStudents(updatedStudents);
-    archiveStudent(student);
-    setUndoItem(student);
+  const handleDeleteStudent = async (studentId) => {
     try {
       const { error } = await supabase
         .from('students')
         .update({ archived: true, status: 'archived', updated_at: new Date().toISOString() })
         .eq('id', studentId);
       if (error) throw error;
+      const updatedStudents = students.filter((item) => item.id !== studentId);
+      setStudents(updatedStudents);
     } catch (error) {
-      console.warn('لم تتم مزامنة أرشفة التلميذ مع الخادم، وتم حفظها محلياً.', error);
+      console.error('Student archive failed:', error);
+      setErrorMessage(`تعذر أرشفة التلميذ في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
+      return;
     }
-    logActivity('أرشفة طالب', `تمت أرشفة ملف ${studentName}.`);
     if (selectedStudent && selectedStudent.id === studentId) {
       setSelectedStudent(null);
     }
@@ -335,22 +279,6 @@ export default function Students() {
     setPendingArchive({ id: studentId, name: studentName });
   };
 
-  const undoLastArchive = async () => {
-    if (!undoItem) return;
-    undoArchiveStudent(undoItem);
-    setStudents((current) => [undoItem, ...current.filter((student) => student.id !== undoItem.id)]);
-    saveLocalStudents([undoItem, ...students.filter((student) => student.id !== undoItem.id)]);
-    try {
-      const { error } = await supabase
-        .from('students')
-        .update({ archived: false, status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', undoItem.id);
-      if (error) throw error;
-    } catch (error) {
-      console.warn('تعذر التراجع عن الأرشفة على الخادم.', error);
-    }
-    setUndoItem(null);
-  };
 
   // =====================================================
   // SESSION COMMENT
@@ -389,7 +317,7 @@ export default function Students() {
       await fetchData();
     } catch (error) {
       console.error('Comment save error:', error);
-      setErrorMessage('');
+      setErrorMessage(`تعذر حفظ الملاحظة في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -592,16 +520,6 @@ export default function Students() {
         </div>
       )}
 
-      {undoItem && (
-        <div className="fixed bottom-5 left-5 z-[10001] flex items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xl" role="status">
-          <span>تمت أرشفة التلميذ.</span>
-          <button type="button" onClick={undoLastArchive} className="rounded-lg bg-orange-500 px-3 py-1.5 text-white hover:bg-orange-600">
-            تراجع
-          </button>
-          <button type="button" aria-label="إغلاق إشعار التراجع" onClick={() => setUndoItem(null)} className="text-slate-300 hover:text-white">×</button>
-        </div>
-      )}
-
       <ConfirmDialog
         open={Boolean(pendingArchive)}
         title="تأكيد أرشفة التلميذ"
@@ -611,7 +529,7 @@ export default function Students() {
         onConfirm={async () => {
           const archive = pendingArchive;
           setPendingArchive(null);
-          await handleDeleteStudent(archive.id, archive.name);
+          await handleDeleteStudent(archive.id);
         }}
       />
 

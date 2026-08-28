@@ -1,10 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  readActivityLog,
-  readArchivedStudents,
-  readAttendanceHistory,
-  restoreStudent,
-} from '../utils/localHistory';
 import { useStudents } from '../context/StudentsContext';
 import { supabase } from '../supabase';
 
@@ -18,38 +12,42 @@ export default function Archive() {
   const [tab, setTab] = useState('attendance');
   const [date, setDate] = useState('');
   const [month, setMonth] = useState('');
-  const [attendance, setAttendance] = useState(readAttendanceHistory);
-  const [archived, setArchived] = useState(readArchivedStudents);
-  const [activities, setActivities] = useState(readActivityLog);
+  const [attendance, setAttendance] = useState([]);
+  const [archived, setArchived] = useState([]);
+  const [activities] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
   const { setStudents } = useStudents();
 
   useEffect(() => {
     let mounted = true;
-    supabase
-      .from('teachers')
-      .select('id, full_name')
-      .then(({ data, error }) => {
-        if (error) throw error;
-        if (mounted) setTeachers(data || []);
-      })
-      .catch((error) => console.warn('تعذر تحميل أسماء الأساتذة للأرشيف.', error));
-
-    const refreshArchive = () => {
-      setArchived(readArchivedStudents());
-      setAttendance(readAttendanceHistory());
+    const loadArchive = async () => {
+      const [{ data: archivedStudents, error: studentsError }, { data: attendanceRows, error: attendanceError }, { data: teacherRows, error: teachersError }] = await Promise.all([
+        supabase.from('students').select('*').eq('archived', true).order('updated_at', { ascending: false }),
+        supabase.from('attendance').select('*').order('date', { ascending: false }),
+        supabase.from('teachers').select('id, full_name'),
+      ]);
+      if (studentsError) throw studentsError;
+      if (attendanceError) throw attendanceError;
+      if (teachersError) throw teachersError;
+      if (mounted) {
+        setArchived(archivedStudents || []);
+        setAttendance(attendanceRows || []);
+        setTeachers(teacherRows || []);
+      }
     };
-    const refreshActivity = () => {
-      setActivities(readActivityLog());
-    };
-    window.addEventListener('isshaam:archive-updated', refreshArchive);
-    window.addEventListener('isshaam:activity-updated', refreshActivity);
-    window.addEventListener('isshaam:attendance-updated', refreshArchive);
+    void loadArchive().catch((error) => {
+      console.error('تعذر تحميل الأرشيف المركزي.', error);
+      if (mounted) setErrorMessage(`تعذر تحميل الأرشيف: ${error.message || 'خطأ غير معروف'}`);
+    });
+    const channel = supabase
+      .channel('academy-archive-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => void loadArchive())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => void loadArchive())
+      .subscribe();
     return () => {
       mounted = false;
-      window.removeEventListener('isshaam:archive-updated', refreshArchive);
-      window.removeEventListener('isshaam:activity-updated', refreshActivity);
-      window.removeEventListener('isshaam:attendance-updated', refreshArchive);
+      void supabase.removeChannel(channel);
     };
   }, []);
 
@@ -85,19 +83,23 @@ export default function Archive() {
   };
 
   const restore = async (id) => {
-    const student = restoreStudent(id);
-    if (student) {
-      setArchived(readArchivedStudents());
-      setStudents((current) => [...current, student]);
-      try {
-        const { error } = await supabase
-          .from('students')
-          .update({ archived: false, status: 'active', updated_at: new Date().toISOString() })
-          .eq('id', id);
-        if (error) throw error;
-      } catch (error) {
-        console.warn('لم تتم مزامنة استعادة التلميذ مع الخادم، وتم حفظها محلياً.', error);
-      }
+    const archivedStudent = archived.find((item) => item.id === id);
+    if (!archivedStudent) return;
+    setErrorMessage('');
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .update({ archived: false, status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (error) throw error;
+      if (!data?.id) throw new Error('لم يتم العثور على سجل التلميذ في قاعدة البيانات.');
+      setArchived((current) => current.filter((item) => item.id !== id));
+      setStudents((current) => [...current.filter((item) => item.id !== id), { ...data, archived: false, status: 'active' }]);
+    } catch (error) {
+      console.error('Student restore failed:', error);
+      setErrorMessage(`تعذر استعادة التلميذ: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -108,6 +110,7 @@ export default function Archive() {
         <h1 className="mt-2 text-3xl font-black">الأرشيف والسجلات</h1>
         <p className="mt-2 text-sm text-slate-200">مراجعة الحضور والطلاب المؤرشفين وسجل العمليات.</p>
       </header>
+      {errorMessage && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{errorMessage}</div>}
 
       <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         {[

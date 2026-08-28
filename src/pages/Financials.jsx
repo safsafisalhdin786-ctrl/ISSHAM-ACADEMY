@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../supabase';
 import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
-import { logActivity } from '../utils/localHistory';
 import { useStudents } from '../context/StudentsContext';
 
 export default function Financials() {
@@ -24,21 +22,17 @@ export default function Financials() {
 
   const fetchData = async () => {
     try {
-      await getDocs(collection(db, 'students'));
-      
-      const paymentsSnap = await getDocs(collection(db, 'payments'));
-      const paymentsList = paymentsSnap.docs.map(doc => doc.data());
-
-      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-      const knownReceipts = new Set(paymentsList.map((payment) => payment.receiptNo).filter(Boolean));
-      setPayments([
-        ...paymentsList,
-        ...localPayments.filter((payment) => !payment.receiptNo || !knownReceipts.has(payment.receiptNo)),
-      ]);
+      const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      setPayments((data || []).map((payment) => ({
+        ...payment,
+        studentId: payment.student_id || payment.studentId,
+        studentName: payment.student_name || payment.studentName,
+        paidAt: payment.paid_at || payment.paidAt,
+      })));
     } catch (err) {
       console.error('خطأ في جلب البيانات:', err);
-      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-      setPayments(localPayments);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -49,19 +43,11 @@ export default function Financials() {
   }, []);
 
   useEffect(() => {
-    const syncPayments = () => {
-      try {
-        setPayments(JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]'));
-      } catch {
-        setPayments([]);
-      }
-    };
-    window.addEventListener('storage', syncPayments);
-    window.addEventListener('isshaam:payments-updated', syncPayments);
-    return () => {
-      window.removeEventListener('storage', syncPayments);
-      window.removeEventListener('isshaam:payments-updated', syncPayments);
-    };
+    const channel = supabase
+      .channel('academy-financials-page-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, fetchData)
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
   }, []);
 
   const getPaymentInfo = (studentId) => {
@@ -70,31 +56,17 @@ export default function Financials() {
 
   const handleMarkAsPaid = async (student) => {
     try {
-      const formattedDate = new Date().toLocaleDateString('ar-MA');
       const newPayment = {
-        studentId: student.id || '',
-        studentName: student.fullName || '',
+        student_id: student.id || '',
+        student_name: student.fullName || student.full_name || '',
         amount: student.monthlyFee || 0,
         month: selectedMonth,
-        status: 'مؤدى',
-        paidAt: formattedDate,
+        status: 'paid',
+        paid_at: new Date().toISOString(),
       };
-
-      setPayments(prev => [...prev, newPayment]);
-      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-      window.localStorage.setItem('isshaam_payments', JSON.stringify([
-        { ...newPayment, createdAt: new Date().toISOString() },
-        ...localPayments,
-      ]));
-      window.dispatchEvent(new Event('isshaam:payments-updated'));
-      logActivity('تسجيل أداء', `تم تسجيل أداء بقيمة ${newPayment.amount} للطالب ${newPayment.studentName}.`);
-
-      await addDoc(collection(db, 'payments'), {
-        ...newPayment,
-        paidAtTimestamp: serverTimestamp()
-      });
-
-      fetchData();
+      const { error } = await supabase.from('payments').insert(newPayment);
+      if (error) throw error;
+      await fetchData();
     } catch (err) {
       console.error('خطأ في تسجيل الأداء:', err);
     }
