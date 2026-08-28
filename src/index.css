@@ -14,6 +14,9 @@
   --success: #16a34a;
   --warning: #f59e0b;
   --danger: #dc2626;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --shadow-card: 0 4px 16px rgb(15 23 42 / 6%);
 }
 
 body {
@@ -82,9 +85,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   flex-direction: column;
 }
 
+html {
+  min-width: 320px;
+  background: var(--background);
+}
+
+body {
+  overflow-x: hidden;
+}
+
 /* Shared internal application design system. Login intentionally stays outside this scope. */
 .app-shell main {
   background: linear-gradient(135deg, var(--background) 0%, #eef2f7 100%) !important;
+  scrollbar-gutter: stable;
 }
 
 .app-shell main .dashboard-hero .text-slate-300 {
@@ -102,8 +115,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .app-shell main .bg-white {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgb(15 23 42 / 6%);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.app-shell main > * {
+  animation: fade-in-up 220ms ease-out both;
+}
+
+.app-shell main h1,
+.app-shell main h2 {
+  letter-spacing: -0.02em;
+}
+
+.app-shell main label {
+  color: var(--text-primary);
 }
 
 .app-shell main [class~="bg-indigo-600"],
@@ -219,8 +245,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .app-shell main select,
 .app-shell main textarea {
   min-height: 44px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   border-color: #cbd5e1;
+  background-color: #ffffff;
+  color: var(--text-primary);
 }
 
 .app-shell main input:focus,
@@ -232,6 +260,46 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .app-header {
   min-height: 4.5rem;
+  border-color: var(--border);
+  box-shadow: 0 2px 12px rgb(15 23 42 / 5%);
+}
+
+.app-shell main table th,
+.app-shell main table td {
+  vertical-align: middle;
+}
+
+.app-shell main table th {
+  white-space: nowrap;
+}
+
+.app-shell main button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.app-shell main .empty-state,
+.app-shell main [data-empty-state="true"] {
+  display: grid;
+  place-items: center;
+  gap: 0.65rem;
+  min-height: 12rem;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .app-shell main {
+    padding: 0.75rem;
+  }
+
+  .app-shell main .bg-white {
+    border-radius: 10px;
+  }
+
+  .app-shell main table {
+    font-size: 0.78rem;
+  }
 }
 
 /* Keep muted utility text readable on white surfaces. */
