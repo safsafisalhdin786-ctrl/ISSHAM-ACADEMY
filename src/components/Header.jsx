@@ -58,8 +58,8 @@ export default function Header({ setMobileOpen }) {
 
         {/* Current page and academy identity */}
         <div className="flex min-w-0 items-center gap-3 mr-auto">
-          <div className={`hidden sm:block ${isFrench ? 'text-left' : 'text-right'}`}>
-            <h1 className="text-2xl font-black text-[#0B192C] leading-tight">
+          <div className={`block min-w-0 ${isFrench ? 'text-left' : 'text-right'}`}>
+            <h1 className="truncate text-lg font-black leading-tight text-[#0B192C] sm:text-2xl">
               {pageTitle}
             </h1>
             <p className="text-xs text-slate-600 mt-0.5">

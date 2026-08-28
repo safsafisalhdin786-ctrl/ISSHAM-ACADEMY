@@ -241,6 +241,20 @@ body {
   transition-duration: 160ms;
 }
 
+.app-shell main button {
+  min-height: 40px;
+  border-radius: var(--radius-control);
+  font-weight: 700;
+}
+
+.app-shell main button[class*="bg-"]:not(:disabled) {
+  box-shadow: 0 3px 10px rgb(15 23 42 / 8%);
+}
+
+.app-shell main button[class*="bg-"]:not(:disabled):hover {
+  box-shadow: 0 6px 16px rgb(15 23 42 / 12%);
+}
+
 .app-shell main input,
 .app-shell main select,
 .app-shell main textarea {
@@ -258,6 +272,13 @@ body {
   box-shadow: 0 0 0 3px rgb(37 99 166 / 15%);
 }
 
+.app-shell main input:user-invalid,
+.app-shell main select:user-invalid,
+.app-shell main textarea:user-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+}
+
 .app-header {
   min-height: 4.5rem;
   border-color: var(--border);
@@ -271,6 +292,7 @@ body {
 
 .app-shell main table th {
   white-space: nowrap;
+  padding-block: 0.85rem;
 }
 
 .app-shell main button:not(:disabled):active {
@@ -316,13 +338,23 @@ th, td {
 }
 
 button:disabled {
-  opacity: 1 !important;
+  opacity: 0.65 !important;
   cursor: not-allowed;
   filter: saturate(0.8);
 }
 
 button, a {
   -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @keyframes fade-in-up {
