@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp 
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  doc,
+  serverTimestamp
 } from 'firebase/firestore';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { maskPhone } from '../utils/security';
 
 const SUBJECTS_LIST = [
   'الرياضيات',
@@ -50,7 +53,7 @@ export default function Teachers() {
       const teachersList = teachersSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),
-        displayName: d.data().fullName || d.data().name || 'أستاذ غير مسمى'
+        displayName: d.data().fullName || d.data().full_name || d.data().name || 'أستاذ غير مسمى'
       }));
       setTeachers(teachersList);
     } catch (error) {
@@ -101,7 +104,7 @@ export default function Teachers() {
   // تجهيز النموذج للتعديل
   const handleEdit = (teacher) => {
     setForm({
-      fullName: teacher.fullName || teacher.name || '',
+      fullName: teacher.full_name || teacher.fullName || teacher.name || '',
       subject: teacher.subject || 'الرياضيات',
       phone: teacher.phone || '',
       salary: teacher.salary || ''
@@ -120,7 +123,22 @@ export default function Teachers() {
     if (!deleteModal.id) return;
     setDeleting(true);
     try {
-      await deleteDoc(doc(db, 'teachers', deleteModal.id));
+      const [legacyStudents, relationalStudents] = await Promise.all([
+        getDocs(query(collection(db, 'students'), where('teacherId', '==', deleteModal.id))),
+        getDocs(query(collection(db, 'students'), where('teacher_id', '==', deleteModal.id))),
+      ]);
+      if (legacyStudents.size > 0 || relationalStudents.size > 0) {
+        await updateDoc(doc(db, 'teachers', deleteModal.id), {
+          status: 'inactive',
+          updatedAt: serverTimestamp(),
+        });
+        alert('تم تعطيل الأستاذ بدلاً من حذفه لأنه مرتبط بتلاميذ محفوظين.');
+      } else {
+        await updateDoc(doc(db, 'teachers', deleteModal.id), {
+          status: 'inactive',
+          updatedAt: serverTimestamp(),
+        });
+      }
       setDeleteModal({ show: false, id: null, name: '' });
       fetchData();
     } catch (error) {
@@ -168,7 +186,7 @@ export default function Teachers() {
           className={`px-5 py-2.5 text-white rounded-lg transition font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer ${
             showAddForm 
               ? 'bg-slate-700 hover:bg-slate-800' 
-              : 'bg-amber-500 hover:bg-amber-600'
+              : 'bg-orange-600 hover:bg-orange-700'
           }`}
         >
           <span>{showAddForm ? '✕' : '+'}</span>
@@ -250,7 +268,7 @@ export default function Teachers() {
             <button 
               type="submit" 
               disabled={saving} 
-              className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-bold transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? 'جاري الحفظ...' : 'حفظ البيانات ✅'}
             </button>
@@ -296,7 +314,7 @@ export default function Teachers() {
             {!showAddForm && (
               <button 
                 onClick={() => setShowAddForm(true)}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
               >
                 + إضافة أستاذ الآن
               </button>
@@ -325,7 +343,7 @@ export default function Teachers() {
                     </td>
                     <td className="p-4 font-mono text-xs" dir="ltr">
                       <div className="flex items-center gap-2 justify-end">
-                        <span className="font-semibold text-slate-800">{teacher.phone || '---'}</span>
+                        <span className="font-semibold text-slate-800">{maskPhone(teacher.phone)}</span>
                         {teacher.phone && (
                           <button
                             onClick={() => openWhatsApp(teacher.phone)}
@@ -364,36 +382,15 @@ export default function Teachers() {
         )}
       </div>
 
-      {/* Modal التأكيد قبل الحذف */}
-      {deleteModal.show && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <span className="text-2xl">⚠️</span>
-              <h3 className="text-lg font-bold">تأكيد حذف الأستاذ</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              هل أنت تأكد من رغبتك في حذف الأستاذ <strong className="text-slate-800">"{deleteModal.name}"</strong>؟ هذا الإجراء لا يمكن التراجع عنه.
-            </p>
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => setDeleteModal({ show: false, id: null, name: '' })}
-                disabled={deleting}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={executeDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold transition cursor-pointer disabled:opacity-50"
-              >
-                {deleting ? 'جاري الحذف...' : 'نعم، حذف'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteModal.show}
+        title="تأكيد تعطيل الأستاذ"
+        message={`هل أنت متأكد من تعطيل الأستاذ "${deleteModal.name}"؟ سيبقى السجل محفوظاً ولن تُحذف العلاقات.`}
+        confirmLabel="تعطيل"
+        busy={deleting}
+        onCancel={() => setDeleteModal({ show: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

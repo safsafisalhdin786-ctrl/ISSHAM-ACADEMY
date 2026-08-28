@@ -1,10 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #1e3a5f;
+  --primary-dark: #0f172a;
+  --primary-light: #eff6ff;
+  --secondary: #2563eb;
+  --accent: #c9a227;
+  --background: #f5f7fa;
+  --surface: #ffffff;
+  --border: #dbe3ec;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+}
+
 body {
   margin: 0;
   padding: 0;
   min-width: 320px;
   font-family: "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--background);
+  color: var(--text-primary);
   direction: rtl;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -16,6 +34,18 @@ body {
 
 button, input, select, textarea {
   font: inherit;
+}
+
+select {
+  color: #0b192c;
+  background-color: #ffffff;
+  border-color: #94a3b8;
+  min-height: 2.75rem;
+}
+
+select option {
+  color: #0b192c;
+  background: #ffffff;
 }
 
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
@@ -50,4 +80,190 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Shared internal application design system. Login intentionally stays outside this scope. */
+.app-shell main {
+  background: linear-gradient(135deg, var(--background) 0%, #eef2f7 100%) !important;
+}
+
+.app-shell main .dashboard-hero .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.app-shell main .dashboard-hero .text-blue-100 {
+  color: #dbeafe !important;
+}
+
+.app-shell main .dashboard-hero .text-amber-300 {
+  color: #fde68a !important;
+}
+
+.app-shell main .bg-white {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 6%);
+}
+
+.app-shell main [class~="bg-indigo-600"],
+.app-shell main [class~="bg-indigo-500"],
+.app-shell main [class~="bg-orange-600"],
+.app-shell main [class~="bg-orange-500"] {
+  background-color: #e67e22 !important;
+  color: #ffffff !important;
+}
+
+.app-shell main [class~="bg-indigo-600"]:hover,
+.app-shell main [class~="bg-indigo-500"]:hover,
+.app-shell main [class~="bg-orange-600"]:hover,
+.app-shell main [class~="bg-orange-500"]:hover {
+  background-color: #c96512 !important;
+}
+
+.app-shell main [class~="bg-blue-700"],
+.app-shell main [class~="bg-blue-600"],
+.app-shell main [class~="bg-blue-500"],
+.app-shell main [class~="bg-slate-800"] {
+  background-color: var(--secondary) !important;
+  color: #ffffff !important;
+}
+
+.app-shell main [class~="bg-emerald-700"],
+.app-shell main [class~="bg-emerald-600"] {
+  background-color: var(--success) !important;
+  color: #ffffff !important;
+}
+
+.app-shell main [class~="bg-rose-700"],
+.app-shell main [class~="bg-rose-600"],
+.app-shell main [class~="bg-red-600"] {
+  background-color: var(--danger) !important;
+  color: #ffffff !important;
+}
+
+.app-shell main [class~="bg-amber-700"],
+.app-shell main [class~="bg-amber-600"],
+.app-shell main [class~="bg-amber-500"] {
+  background-color: var(--accent) !important;
+  color: var(--primary-dark) !important;
+}
+
+.app-shell main [class~="bg-blue-700"]:hover,
+.app-shell main [class~="bg-blue-600"]:hover,
+.app-shell main [class~="bg-blue-500"]:hover,
+.app-shell main [class~="bg-slate-800"]:hover {
+  background-color: var(--primary) !important;
+}
+
+.app-shell main [class~="bg-emerald-700"]:hover,
+.app-shell main [class~="bg-emerald-600"]:hover {
+  background-color: #15803d !important;
+}
+
+.app-shell main [class~="bg-rose-700"]:hover,
+.app-shell main [class~="bg-rose-600"]:hover,
+.app-shell main [class~="bg-red-600"]:hover {
+  background-color: #b91c1c !important;
+}
+
+.app-shell main [class~="bg-amber-700"]:hover,
+.app-shell main [class~="bg-amber-600"]:hover,
+.app-shell main [class~="bg-amber-500"]:hover {
+  background-color: #a7831f !important;
+}
+
+.app-shell main table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #dbe3ec;
+  border-radius: 0.875rem;
+}
+
+.app-shell main thead {
+  background: var(--primary) !important;
+}
+
+.app-shell main th {
+  color: #ffffff !important;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.app-shell main td {
+  color: var(--text-primary);
+  border-color: #e2e8f0;
+}
+
+.app-shell main tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.app-shell main tbody tr:hover {
+  background-color: var(--primary-light);
+}
+
+.app-shell main tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.app-shell main button,
+.app-shell main a {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 160ms;
+}
+
+.app-shell main input,
+.app-shell main select,
+.app-shell main textarea {
+  min-height: 44px;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+}
+
+.app-shell main input:focus,
+.app-shell main select:focus,
+.app-shell main textarea:focus {
+  border-color: #2563a6;
+  box-shadow: 0 0 0 3px rgb(37 99 166 / 15%);
+}
+
+.app-header {
+  min-height: 4.5rem;
+}
+
+/* Keep muted utility text readable on white surfaces. */
+.text-slate-400, .text-gray-400, .text-slate-500, .text-gray-500 {
+  color: #475569 !important;
+}
+
+.text-slate-300, .text-gray-300 {
+  color: #334155 !important;
+}
+
+th, td {
+  color: #0f172a;
+}
+
+button:disabled {
+  opacity: 1 !important;
+  cursor: not-allowed;
+  filter: saturate(0.8);
+}
+
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

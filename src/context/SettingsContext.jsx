@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS = {
     academyName: 'ISSHAAM ACADEMY',
     logoUrl: defaultLogoUrl,
     bgColor: 'bg-slate-100',
-    primaryColor: '#f59e0b',
+    primaryColor: '#2563eb',
     language: 'ar',
   },
 
@@ -36,21 +36,38 @@ const DEFAULT_SETTINGS = {
   adminEmails: [],
 };
 
+const LOCAL_SETTINGS_KEY = 'isshaam_settings';
+
+const readLocalSettings = () => {
+  try {
+    return mergeSettings(DEFAULT_SETTINGS, JSON.parse(window.localStorage.getItem(LOCAL_SETTINGS_KEY) || '{}'));
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+};
+
 /**
  * دمج الإعدادات الافتراضية مع الإعدادات الحالية
  * والإعدادات الجديدة بدون حذف أي بيانات موجودة.
  */
 const mergeSettings = (current = {}, incoming = {}) => {
+  const branding = {
+    ...DEFAULT_SETTINGS.branding,
+    ...(current?.branding || {}),
+    ...(incoming?.branding || {}),
+  };
+
+  // Migrate the original default without overriding an administrator's custom color.
+  if (branding.primaryColor === '#f59e0b') {
+    branding.primaryColor = DEFAULT_SETTINGS.branding.primaryColor;
+  }
+
   return {
     ...DEFAULT_SETTINGS,
     ...current,
     ...incoming,
 
-    branding: {
-      ...DEFAULT_SETTINGS.branding,
-      ...(current?.branding || {}),
-      ...(incoming?.branding || {}),
-    },
+    branding,
 
     general: {
       ...DEFAULT_SETTINGS.general,
@@ -67,7 +84,7 @@ const mergeSettings = (current = {}, incoming = {}) => {
 };
 
 export function SettingsProvider({ children }) {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(readLocalSettings);
   const [loading, setLoading] = useState(true);
   const [settingsError, setSettingsError] = useState(null);
 
@@ -95,8 +112,9 @@ export function SettingsProvider({ children }) {
                 firestoreSettings
               )
             );
+            window.localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(mergeSettings(DEFAULT_SETTINGS, firestoreSettings)));
           } else {
-            setSettings(DEFAULT_SETTINGS);
+            setSettings(readLocalSettings());
           }
 
           setSettingsError(null);
@@ -107,7 +125,7 @@ export function SettingsProvider({ children }) {
             error
           );
 
-          setSettings(DEFAULT_SETTINGS);
+          setSettings(readLocalSettings());
           setSettingsError(
             'تعذر معالجة إعدادات الأكاديمية.'
           );
@@ -127,7 +145,7 @@ export function SettingsProvider({ children }) {
 
         // نخلي التطبيق يخدم بالإعدادات الافتراضية
         // بدل ما يطيح الموقع كامل.
-        setSettings(DEFAULT_SETTINGS);
+        setSettings(readLocalSettings());
         setLoading(false);
       }
     );
@@ -146,6 +164,8 @@ export function SettingsProvider({ children }) {
         settings,
         newSettings
       );
+      setSettings(updatedSettings);
+      window.localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(updatedSettings));
 
       const settingsRef = doc(
         db,
@@ -161,7 +181,6 @@ export function SettingsProvider({ children }) {
         }
       );
 
-      setSettings(updatedSettings);
       setSettingsError(null);
 
       return updatedSettings;
@@ -175,7 +194,7 @@ export function SettingsProvider({ children }) {
         'تعذر حفظ إعدادات الأكاديمية.'
       );
 
-      throw error;
+      return mergeSettings(settings, newSettings);
     }
   };
 
@@ -184,6 +203,7 @@ export function SettingsProvider({ children }) {
    */
   const resetLocalSettings = () => {
     setSettings(DEFAULT_SETTINGS);
+    window.localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
     setSettingsError(null);
   };
 

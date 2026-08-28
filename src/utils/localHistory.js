@@ -22,6 +22,7 @@ export const logActivity = (type, details) => {
     ...readArray(ACTIVITY_KEY),
   ].slice(0, 500);
   window.localStorage.setItem(ACTIVITY_KEY, JSON.stringify(entries));
+  window.dispatchEvent(new Event('isshaam:activity-updated'));
 };
 
 export const readActivityLog = () => readArray(ACTIVITY_KEY);
@@ -35,6 +36,7 @@ export const saveAttendanceHistory = (records) => {
     ATTENDANCE_KEY,
     JSON.stringify([...records, ...withoutSameDate].slice(0, 2000))
   );
+  window.dispatchEvent(new Event('isshaam:attendance-updated'));
 };
 
 export const readAttendanceHistory = () => readArray(ATTENDANCE_KEY);
@@ -45,6 +47,7 @@ export const archiveStudent = (student) => {
     ...readArray(ARCHIVED_STUDENTS_KEY).filter((item) => item.id !== student.id),
   ];
   window.localStorage.setItem(ARCHIVED_STUDENTS_KEY, JSON.stringify(archived));
+  window.dispatchEvent(new Event('isshaam:archive-updated'));
 };
 
 export const readArchivedStudents = () => readArray(ARCHIVED_STUDENTS_KEY);
@@ -56,5 +59,16 @@ export const restoreStudent = (id) => {
     ARCHIVED_STUDENTS_KEY,
     JSON.stringify(archived.filter((item) => item.id !== id))
   );
+  window.dispatchEvent(new Event('isshaam:archive-updated'));
   return student ? { ...student, archived: false } : null;
+};
+
+export const undoArchiveStudent = (student) => {
+  if (!student?.id) return;
+  const archived = readArray(ARCHIVED_STUDENTS_KEY);
+  window.localStorage.setItem(
+    ARCHIVED_STUDENTS_KEY,
+    JSON.stringify(archived.filter((item) => item.id !== student.id))
+  );
+  window.dispatchEvent(new Event('isshaam:archive-updated'));
 };

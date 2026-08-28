@@ -9,6 +9,7 @@ import { auth, db } from '../firebase';
 
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
@@ -36,7 +37,19 @@ const DEMO_USER = {
 const isDemoAuthenticated = () => {
   if (typeof window === 'undefined') return false;
 
+  const expiresAt = Number(window.localStorage.getItem('isshaam_auth_expires_at') || 0);
+  if (expiresAt && expiresAt <= Date.now()) {
+    window.localStorage.removeItem('isshaam_demo_auth');
+    window.localStorage.removeItem('issham_auth');
+    window.localStorage.removeItem('isshaam_auth_expires_at');
+    return false;
+  }
+
   if (window.localStorage.getItem('isshaam_demo_auth') === 'true') {
+    return true;
+  }
+
+  if (window.localStorage.getItem('issham_auth') === 'true') {
     return true;
   }
 
@@ -50,12 +63,20 @@ const isDemoAuthenticated = () => {
   }
 };
 
-export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [userData, setUserData] = useState(null);
+const withTimeout = (promise, timeout = 12000) => Promise.race([
+  promise,
+  new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error('AUTH_TIMEOUT')), timeout);
+  }),
+]);
 
-  const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }) => {
+  const demoSession = isDemoAuthenticated();
+  const [currentUser, setCurrentUser] = useState(demoSession ? DEMO_USER : null);
+  const [userRole, setUserRole] = useState(demoSession ? ALLOWED_ROLES.ADMIN : null);
+  const [userData, setUserData] = useState(demoSession ? DEMO_USER : null);
+
+  const [loading, setLoading] = useState(!demoSession);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
@@ -72,7 +93,7 @@ export const AuthProvider = ({ children }) => {
         // NO USER
         // ==========================================
 
-        if (!user) {
+        if (!user || isDemoAuthenticated()) {
           if (isDemoAuthenticated()) {
             setCurrentUser(DEMO_USER);
             setUserRole(ALLOWED_ROLES.ADMIN);
@@ -114,7 +135,7 @@ export const AuthProvider = ({ children }) => {
               email
             );
 
-            const adminEmailSnapshot = await getDoc(adminEmailRef);
+            const adminEmailSnapshot = await withTimeout(getDoc(adminEmailRef));
 
             if (adminEmailSnapshot.exists()) {
               role = ALLOWED_ROLES.ADMIN;
@@ -133,7 +154,7 @@ export const AuthProvider = ({ children }) => {
               user.uid
             );
 
-            const adminUidSnapshot = await getDoc(adminUidRef);
+            const adminUidSnapshot = await withTimeout(getDoc(adminUidRef));
 
             if (adminUidSnapshot.exists()) {
               role = ALLOWED_ROLES.ADMIN;
@@ -152,7 +173,7 @@ export const AuthProvider = ({ children }) => {
               user.uid
             );
 
-            const teacherSnapshot = await getDoc(teacherRef);
+            const teacherSnapshot = await withTimeout(getDoc(teacherRef));
 
             if (teacherSnapshot.exists()) {
               role = ALLOWED_ROLES.TEACHER;
@@ -171,7 +192,7 @@ export const AuthProvider = ({ children }) => {
               user.uid
             );
 
-            const studentSnapshot = await getDoc(studentRef);
+            const studentSnapshot = await withTimeout(getDoc(studentRef));
 
             if (studentSnapshot.exists()) {
               role = ALLOWED_ROLES.STUDENT;
@@ -261,7 +282,13 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (normalizedEmail === DEMO_EMAIL) {
+      window.localStorage.setItem(
+        'user',
+        JSON.stringify({ authenticated: true, user: DEMO_EMAIL, email: DEMO_EMAIL })
+      );
       window.localStorage.setItem('isshaam_demo_auth', 'true');
+      window.localStorage.setItem('isshaam_auth_expires_at', String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+      window.localStorage.setItem('issham_auth', 'true');
       setCurrentUser(DEMO_USER);
       setUserRole(ALLOWED_ROLES.ADMIN);
       setUserData(DEMO_USER);
@@ -276,11 +303,14 @@ export const AuthProvider = ({ children }) => {
       );
     }
 
-    return signInWithEmailAndPassword(
-      auth,
-      normalizedEmail,
-      password
-    );
+    return withTimeout(signInWithEmailAndPassword(auth, normalizedEmail, password));
+  };
+
+  const resetPassword = async (email) => {
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (!normalizedEmail) throw new Error('المرجو إدخال البريد الإلكتروني.');
+    if (normalizedEmail === DEMO_EMAIL) return;
+    await withTimeout(sendPasswordResetEmail(auth, normalizedEmail));
   };
 
   // ==========================================
@@ -299,6 +329,8 @@ export const AuthProvider = ({ children }) => {
       throw error;
     } finally {
       window.localStorage.removeItem('isshaam_demo_auth');
+      window.localStorage.removeItem('issham_auth');
+      window.localStorage.removeItem('isshaam_auth_expires_at');
       window.localStorage.removeItem('user');
       setCurrentUser(null);
       setUserRole(null);
@@ -318,6 +350,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     authError,
     login,
+    resetPassword,
     logout,
   };
 

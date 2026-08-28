@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { logActivity } from '../utils/localHistory';
+import { useStudents } from '../context/StudentsContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Payments() {
-  const [students, setStudents] = useState([]);
+  const { students, setStudents } = useStudents();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -16,8 +18,9 @@ export default function Payments() {
 
   // الوصل الحالي المعروض للطباعة
   const [printedReceipt, setPrintedReceipt] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [studentsSnap, paymentsSnap] = await Promise.all([
@@ -25,23 +28,34 @@ export default function Payments() {
         getDocs(collection(db, 'payments'))
       ]);
 
-      const loadedStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.archived);
-      setStudents(loadedStudents);
+      const loadedStudents = studentsSnap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fullName: data.fullName || data.full_name || '',
+          parentPhone: data.parentPhone || data.parent_phone || '',
+          monthlyFee: data.monthlyFee ?? data.monthly_fee ?? 0,
+          level: data.level || data.academic_level || '',
+        };
+      }).filter(s => !s.archived);
+      setStudents((current) => {
+        const localIds = new Set(current.map((student) => student.id));
+        return [...current, ...loadedStudents.filter((student) => !localIds.has(student.id))];
+      });
 
       const loadedPayments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPayments(loadedPayments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     } catch (e) {
       console.error("خطأ في جلب البيانات:", e);
-      const localStudents = JSON.parse(window.localStorage.getItem('isshaam_students') || '[]');
       const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
-      setStudents(localStudents.filter((student) => !student.archived));
       setPayments(localPayments);
     } finally {
       setLoading(false);
     }
-  };
+  }, [setStudents]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleStudentSelect = (e) => {
     const sId = e.target.value;
@@ -57,9 +71,11 @@ export default function Payments() {
     if (!selectedStudentId || !amountPaid) return alert('المرجو اختيار التلميذ والمبلغ');
 
     const student = students.find(s => s.id === selectedStudentId);
+    if (!student) return;
     const receiptData = {
       receiptNo: `REC-${Date.now().toString().slice(-6)}`,
       studentId: student.id,
+      student_id: student.id,
       studentName: student.fullName,
       parentPhone: student.parentPhone || '',
       level: student.level,
@@ -80,7 +96,16 @@ export default function Payments() {
       { ...receiptData, createdAt: new Date().toISOString() },
       ...localPayments,
     ]));
-    logActivity('تسجيل أداء', `تم تسجيل أداء بقيمة ${amountPaid} للطالب ${student.fullName}.`);
+    window.dispatchEvent(new Event('isshaam:payments-updated'));
+    setStudents((current) => current.map((item) => (
+      item.id === student.id ? { ...item, paymentStatus: 'paid' } : item
+    )));
+    logActivity('payment_created', {
+      message: `تم تسجيل أداء بقيمة ${amountPaid} للطالب ${student.fullName}.`,
+      studentName: student.fullName,
+      studentId: student.id,
+      amount: amountPaid,
+    });
 
     try {
       await addDoc(collection(db, 'payments'), receiptData);
@@ -91,8 +116,7 @@ export default function Payments() {
   };
 
   // حذف وصل/عملية أداء من Firestore (سلة المهملات)
-  const handleDeletePayment = async (paymentId, receiptNo) => {
-    if (window.confirm(`هل أنت تأكد من رغبتك في نقل/حذف الوصل رقم ${receiptNo} إلى سلة المهملات؟`)) {
+  const handleDeletePayment = async (paymentId) => {
       try {
         await deleteDoc(doc(db, 'payments', paymentId));
         setPayments(prev => prev.filter(p => p.id !== paymentId));
@@ -100,7 +124,6 @@ export default function Payments() {
         console.error("خطأ أثناء حذف الوصل:", error);
         alert("حدث خطأ أثناء عملية الحذف");
       }
-    }
   };
 
   // إرسال وصل الاستلام عبر الواتساب عند تسديد الواجب
@@ -219,7 +242,7 @@ _إدارة أكاديمية عصام للدعم والتميز_`;
           <div className="md:col-span-4 mt-2">
             <button
               type="submit"
-              className="w-full md:w-auto px-8 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black text-sm shadow-md cursor-pointer transition"
+              className="w-full md:w-auto px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-black text-sm shadow-md cursor-pointer transition"
             >
               💳 تسجيل الدفع وإصدار الوصل المـكـاشـي
             </button>
@@ -291,7 +314,7 @@ _إدارة أكاديمية عصام للدعم والتميز_`;
                         📲 واتساب
                       </button>
                       <button
-                        onClick={() => handleDeletePayment(p.id, p.receiptNo)}
+                        onClick={() => setPendingDelete({ id: p.id, receiptNo: p.receiptNo })}
                         className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-black rounded cursor-pointer"
                         title="حذف إلى سلة المهملات"
                       >
@@ -394,6 +417,7 @@ _إدارة أكاديمية عصام للدعم والتميز_`;
                     <span>{printedReceipt.notes}</span>
                   </div>
                 )}
+
               </div>
 
               <div className="bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 text-center relative z-10">
@@ -410,6 +434,19 @@ _إدارة أكاديمية عصام للدعم والتميز_`;
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="تأكيد حذف الوصل"
+        message={`هل أنت متأكد من نقل الوصل رقم ${pendingDelete?.receiptNo || ''} إلى سلة المهملات؟`}
+        confirmLabel="حذف الوصل"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          const payment = pendingDelete;
+          setPendingDelete(null);
+          await handleDeletePayment(payment.id);
+        }}
+      />
 
     </div>
   );

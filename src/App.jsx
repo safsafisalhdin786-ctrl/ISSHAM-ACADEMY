@@ -22,6 +22,10 @@ import Payments from './pages/Payments';
 import Financials from './pages/Financials';
 import AppSettings from './pages/AppSettings';
 import Archive from './pages/Archive';
+import { I18nBridge } from './i18n';
+import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/Protectedroute';
+import { StudentsProvider } from './context/StudentsContext';
 
 // Protect the application routes and provide the shared application shell.
 function ProtectedLayout() {
@@ -69,7 +73,7 @@ function ProtectedLayout() {
 
   return (
     <div 
-      className={`flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
+    className={`app-shell flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 ${isRtl ? 'text-right dir-rtl' : 'text-left dir-ltr'}`} 
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
@@ -87,8 +91,11 @@ function ProtectedLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <SettingsProvider>
-        <Router>
+      <StudentsProvider>
+        <SettingsProvider>
+          <I18nBridge />
+          <Router>
+          <ErrorBoundary>
           <Routes>
             <Route path="/login" element={<Login />} />
 
@@ -97,16 +104,18 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="students" element={<Students />} />
               <Route path="attendance" element={<Attendance />} />
-              <Route path="teachers" element={<Teachers />} />
-              <Route path="payments" element={<Payments />} />
-              <Route path="financials" element={<Financials />} />
-              <Route path="settings" element={<AppSettings />} />
-              <Route path="archive" element={<Archive />} />
+              <Route path="teachers" element={<ProtectedRoute allowedRoles={['admin']}><Teachers /></ProtectedRoute>} />
+              <Route path="payments" element={<ProtectedRoute allowedRoles={['admin']}><Payments /></ProtectedRoute>} />
+              <Route path="financials" element={<ProtectedRoute allowedRoles={['admin']}><Financials /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute allowedRoles={['admin']}><AppSettings /></ProtectedRoute>} />
+              <Route path="archive" element={<ProtectedRoute allowedRoles={['admin']}><Archive /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
-        </Router>
-      </SettingsProvider>
+          </ErrorBoundary>
+          </Router>
+        </SettingsProvider>
+      </StudentsProvider>
     </AuthProvider>
   );
 }

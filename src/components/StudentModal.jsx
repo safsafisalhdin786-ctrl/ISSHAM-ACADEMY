@@ -6,6 +6,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { readAttendanceHistory } from '../utils/localHistory';
 
 export default function StudentProfileModal({ student, onClose }) {
   const [activeTab, setActiveTab] = useState('info');
@@ -91,9 +92,16 @@ export default function StudentProfileModal({ student, onClose }) {
         );
 
         if (!cancelled) {
-          setError(
-            'تعذر تحميل سجل التلميذ. يرجى المحاولة مرة أخرى.'
+          setAttendanceRecords(
+            readAttendanceHistory().filter(
+              (record) => record.student_id === student.id
+            )
           );
+          setPaymentRecords(
+            JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]')
+              .filter((record) => record.studentId === student.id)
+          );
+          setError('');
         }
       } finally {
         if (!cancelled) {
@@ -318,6 +326,11 @@ export default function StudentProfileModal({ student, onClose }) {
 
                 <p className="text-xs text-slate-300 mt-1">
                   {student.level || 'المستوى غير محدد'}
+                  {' • '}
+                  الأستاذ:{' '}
+                  <span className="text-blue-200 font-bold">
+                    {student.teacher_name || student.teacherName || student.teacher?.full_name || 'غير محدد'}
+                  </span>
                   {' • '}
                   الواجب:{' '}
                   <span className="text-emerald-400 font-bold">

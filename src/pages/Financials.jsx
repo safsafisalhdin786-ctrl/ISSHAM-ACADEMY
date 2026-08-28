@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
+import { logActivity } from '../utils/localHistory';
+import { useStudents } from '../context/StudentsContext';
 
 export default function Financials() {
-  const [students, setStudents] = useState([]);
+  const { students } = useStudents();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,16 +24,21 @@ export default function Financials() {
 
   const fetchData = async () => {
     try {
-      const studentsSnap = await getDocs(collection(db, 'students'));
-      const studentsList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      await getDocs(collection(db, 'students'));
       
       const paymentsSnap = await getDocs(collection(db, 'payments'));
       const paymentsList = paymentsSnap.docs.map(doc => doc.data());
 
-      setStudents(studentsList);
-      setPayments(paymentsList);
+      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
+      const knownReceipts = new Set(paymentsList.map((payment) => payment.receiptNo).filter(Boolean));
+      setPayments([
+        ...paymentsList,
+        ...localPayments.filter((payment) => !payment.receiptNo || !knownReceipts.has(payment.receiptNo)),
+      ]);
     } catch (err) {
       console.error('خطأ في جلب البيانات:', err);
+      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
+      setPayments(localPayments);
     } finally {
       setLoading(false);
     }
@@ -41,8 +48,24 @@ export default function Financials() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const syncPayments = () => {
+      try {
+        setPayments(JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]'));
+      } catch {
+        setPayments([]);
+      }
+    };
+    window.addEventListener('storage', syncPayments);
+    window.addEventListener('isshaam:payments-updated', syncPayments);
+    return () => {
+      window.removeEventListener('storage', syncPayments);
+      window.removeEventListener('isshaam:payments-updated', syncPayments);
+    };
+  }, []);
+
   const getPaymentInfo = (studentId) => {
-    return payments.find(p => p.studentId === studentId && p.month === selectedMonth && (p.status === 'مؤدى' || p.status === 'paid'));
+    return payments.find(p => String(p.studentId) === String(studentId) && p.month === selectedMonth && (p.status === 'مؤدى' || p.status === 'paid'));
   };
 
   const handleMarkAsPaid = async (student) => {
@@ -58,6 +81,13 @@ export default function Financials() {
       };
 
       setPayments(prev => [...prev, newPayment]);
+      const localPayments = JSON.parse(window.localStorage.getItem('isshaam_payments') || '[]');
+      window.localStorage.setItem('isshaam_payments', JSON.stringify([
+        { ...newPayment, createdAt: new Date().toISOString() },
+        ...localPayments,
+      ]));
+      window.dispatchEvent(new Event('isshaam:payments-updated'));
+      logActivity('تسجيل أداء', `تم تسجيل أداء بقيمة ${newPayment.amount} للطالب ${newPayment.studentName}.`);
 
       await addDoc(collection(db, 'payments'), {
         ...newPayment,
@@ -114,7 +144,8 @@ export default function Financials() {
     printWindow.document.close();
   };
 
-  const filteredStudents = students.filter(s => {
+  const activeStudents = students.filter((student) => !student.archived);
+  const filteredStudents = activeStudents.filter(s => {
     const matchesSearch = (s.fullName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const paid = !!getPaymentInfo(s.id);
     if (statusFilter === 'paid') return matchesSearch && paid;
@@ -122,8 +153,8 @@ export default function Financials() {
     return matchesSearch;
   });
 
-  const totalCollected = students.reduce((acc, s) => getPaymentInfo(s.id) ? acc + Number(s.monthlyFee || 0) : acc, 0);
-  const totalPending = students.reduce((acc, s) => !getPaymentInfo(s.id) ? acc + Number(s.monthlyFee || 0) : acc, 0);
+  const totalCollected = activeStudents.reduce((acc, s) => getPaymentInfo(s.id) ? acc + Number(s.monthlyFee || 0) : acc, 0);
+  const totalPending = activeStudents.reduce((acc, s) => !getPaymentInfo(s.id) ? acc + Number(s.monthlyFee || 0) : acc, 0);
 
   return (
     <div className="p-6 space-y-6 dir-rtl text-right pb-12">
@@ -168,7 +199,7 @@ export default function Financials() {
           <div>
             <p className="text-xs font-bold text-slate-400">نسبة التحصيل</p>
             <h3 className="text-xl font-extrabold text-indigo-600 mt-1">
-              {students.length > 0 ? Math.round((students.filter(s => getPaymentInfo(s.id)).length / students.length) * 100) : 0}%
+              {activeStudents.length > 0 ? Math.round((activeStudents.filter(s => getPaymentInfo(s.id)).length / activeStudents.length) * 100) : 0}%
             </h3>
           </div>
           <CheckCircle2 className="w-6 h-6 text-indigo-600" />
@@ -188,9 +219,9 @@ export default function Financials() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setStatusFilter('all')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100">الكل</button>
-          <button onClick={() => setStatusFilter('paid')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700">تم الأداء</button>
-          <button onClick={() => setStatusFilter('pending')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700">غير مؤدى</button>
+          <button onClick={() => setStatusFilter('all')} className="border border-slate-700 bg-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold text-white">الكل</button>
+          <button onClick={() => setStatusFilter('paid')} className="border border-emerald-300 bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800">تم الأداء</button>
+          <button onClick={() => setStatusFilter('pending')} className="border border-rose-300 bg-rose-100 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-800">غير مؤدى</button>
         </div>
       </div>
 
@@ -201,7 +232,7 @@ export default function Financials() {
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b text-gray-600 text-sm">
+                <tr className="bg-slate-100 border-b border-slate-300 text-slate-900 text-sm">
                   <th className="p-4">اسم التلميذ</th>
                   <th className="p-4">المستوى</th>
                   <th className="p-4">الواجب الشهري</th>
@@ -220,9 +251,9 @@ export default function Financials() {
                       <td className="p-4 font-bold text-emerald-600">{s.monthlyFee || 0} DH</td>
                       <td className="p-4">
                         {paid ? (
-                          <span className="text-green-700 bg-green-50 px-2 py-1 rounded-lg text-xs font-bold">تم الأداء ✅</span>
+                          <span className="border border-emerald-300 bg-emerald-100 px-2 py-1 rounded-lg text-xs font-bold text-emerald-800">تم الأداء ✅</span>
                         ) : (
-                          <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded-lg text-xs font-bold">غير مؤدى ⏳</span>
+                          <span className="border border-rose-300 bg-rose-100 px-2 py-1 rounded-lg text-xs font-bold text-rose-800">غير مؤدى ⏳</span>
                         )}
                       </td>
                       <td className="p-4 text-center">

@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
-import { archiveStudent, logActivity } from '../utils/localHistory';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { archiveStudent, logActivity, undoArchiveStudent } from '../utils/localHistory';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { maskPhone } from '../utils/security';
+import { useStudents } from '../context/StudentsContext';
 
 const MOROCCAN_LEVELS = [
   'الأول ابتدائي',
@@ -39,7 +44,7 @@ const saveLocalStudents = (students) => {
 };
 
 export default function Students() {
-  const [students, setStudents] = useState(readLocalStudents);
+  const { students, setStudents } = useStudents();
   const [teachers, setTeachers] = useState([]);
   const [levels, setLevels] = useState([]);
 
@@ -48,8 +53,11 @@ export default function Students() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [newComment, setNewComment] = useState('');
+  const [pendingArchive, setPendingArchive] = useState(null);
+  const [undoItem, setUndoItem] = useState(null);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -88,7 +96,6 @@ export default function Students() {
         supabase
           .from('teachers')
           .select('*')
-          .eq('status', 'active')
           .order('full_name', { ascending: true }),
 
         supabase
@@ -99,8 +106,14 @@ export default function Students() {
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
-      if (teachersResult.error && teachersResult.error.code !== 'PGRST116') {
-        console.warn('Teachers notice:', teachersResult.error);
+      let loadedTeachers = teachersResult.data || [];
+      if (teachersResult.error) {
+        console.warn('Supabase teachers unavailable; trying Firestore.', teachersResult.error);
+        const teachersSnapshot = await getDocs(collection(db, 'teachers'));
+        loadedTeachers = teachersSnapshot.docs.map((teacherDoc) => ({
+          id: teacherDoc.id,
+          ...teacherDoc.data(),
+        }));
       }
       if (levelsResult.error && levelsResult.error.code !== 'PGRST116') {
         console.warn('Levels notice:', levelsResult.error);
@@ -112,17 +125,26 @@ export default function Students() {
         ...localStudents,
         ...remoteStudents.filter((student) => !localIds.has(student.id)),
       ]);
-      setTeachers(teachersResult.data || []);
+      setTeachers(loadedTeachers.filter((teacher) => teacher.status !== 'inactive'));
       setLevels(levelsResult.data?.length ? levelsResult.data : LEVEL_OPTIONS);
     } catch (error) {
       console.error('Students loading error:', error);
       setStudents(readLocalStudents());
       setLevels(LEVEL_OPTIONS);
-      setErrorMessage('');
+      try {
+        const teachersSnapshot = await getDocs(collection(db, 'teachers'));
+        setTeachers(teachersSnapshot.docs
+          .map((teacherDoc) => ({ id: teacherDoc.id, ...teacherDoc.data() }))
+          .filter((teacher) => teacher.status !== 'inactive'));
+      } catch (teacherError) {
+        console.error('Teachers loading error:', teacherError);
+        setTeachers([]);
+        setErrorMessage('تعذر تحميل قائمة الأساتذة من قاعدة البيانات. يرجى المحاولة مرة أخرى.');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setStudents]);
 
   useEffect(() => {
     fetchData();
@@ -142,10 +164,15 @@ export default function Students() {
   };
 
   const getTeacherForStudent = (student) => {
-    if (student.teachers?.full_name) return student.teachers.full_name;
+    const relation = student.teachers || student.teacher;
+    if (relation) {
+      const relationName = relation.full_name || relation.fullName || relation.name;
+      if (relationName) return relationName;
+    }
+    if (student.teacher_name) return student.teacher_name;
     if (student.teacher_id && teachers.length > 0) {
       const found = teachers.find((t) => String(t.id) === String(student.teacher_id));
-      if (found) return found.full_name;
+      if (found) return found.full_name || found.fullName || found.name || found.displayName;
     }
     return 'غير محدد';
   };
@@ -163,6 +190,7 @@ export default function Students() {
   };
 
   const resetForm = () => {
+    setEditingStudentId(null);
     setFormData({
       full_name: '',
       level_id: '',
@@ -179,7 +207,7 @@ export default function Students() {
   // ADD STUDENT
   // =====================================================
 
-  const handleAddStudent = (e) => {
+  const handleAddStudent = async (e) => {
     e.preventDefault();
 
     if (!formData.full_name.trim()) {
@@ -192,11 +220,16 @@ export default function Students() {
       return;
     }
 
+    if (!formData.teacher_id) {
+      setErrorMessage('المرجو اختيار الأستاذ قبل حفظ التلميذ.');
+      return;
+    }
+
     setSaving(true);
     setErrorMessage('');
 
     const payload = {
-      id: `local-${Date.now()}`,
+      id: editingStudentId || `local-${Date.now()}`,
       full_name: formData.full_name.trim(),
       level_id: levels.some((level) => String(level.id) === String(formData.level_id))
         ? formData.level_id
@@ -212,13 +245,64 @@ export default function Students() {
       archived: false,
       localOnly: true,
     };
-    const updatedStudents = [payload, ...students];
+    const teacher = teachers.find((item) => String(item.id) === String(payload.teacher_id));
+    const payloadWithTeacher = {
+      ...payload,
+      teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '',
+    };
+    const updatedStudents = editingStudentId
+      ? students.map((student) => (student.id === editingStudentId ? { ...student, ...payloadWithTeacher } : student))
+      : [payloadWithTeacher, ...students];
     setStudents(updatedStudents);
     saveLocalStudents(updatedStudents);
-    logActivity('إضافة طالب', `تمت إضافة الطالب ${payload.full_name}.`);
-    setShowAddModal(false);
-    resetForm();
-    setSaving(false);
+    logActivity(editingStudentId ? 'تعديل طالب' : 'إضافة طالب', `${editingStudentId ? 'تم تعديل' : 'تمت إضافة'} الطالب ${payload.full_name}.`);
+
+    // Keep local-first UX while synchronizing to Supabase when configured.
+    try {
+      const studentFields = {
+        full_name: payload.full_name,
+        level_id: payload.level_id,
+        teacher_id: payload.teacher_id,
+        parent_phone: payload.parent_phone,
+        parent_whatsapp: payload.parent_whatsapp,
+        monthly_fee: payload.monthly_fee,
+        status: payload.status,
+        archived: false,
+      };
+      const result = editingStudentId
+        ? await supabase.from('students').update(studentFields).eq('id', editingStudentId).select('*').single()
+        : await supabase.from('students').insert(studentFields).select('*').single();
+      const { data, error } = result;
+      if (error) throw error;
+      if (data?.id) {
+        setStudents((current) => editingStudentId
+          ? current.map((student) => (student.id === editingStudentId ? { ...data, teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '', localOnly: false } : student))
+          : current.map((student) => (student.id === payload.id ? { ...data, teacher_name: teacher?.full_name || teacher?.fullName || teacher?.name || '', localOnly: false } : student)));
+      }
+    } catch (error) {
+      console.error('Student teacher relationship save failed:', error);
+      setErrorMessage('تعذر حفظ علاقة الأستاذ بالتلميذ في قاعدة البيانات. تم الاحتفاظ بالبيانات محلياً، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setSaving(false);
+      setShowAddModal(false);
+      resetForm();
+    }
+  };
+
+  const openEditStudent = (student) => {
+    setSelectedStudent(null);
+    setEditingStudentId(student.id);
+    setFormData({
+      full_name: student.full_name || student.fullName || '',
+      level_id: student.level_id || student.academic_level || '',
+      teacher_id: student.teacher_id || student.teacherId || '',
+      parent_phone: student.parent_phone || student.parentPhone || '',
+      parent_whatsapp: student.parent_whatsapp || student.parentWhatsapp || '',
+      monthly_fee: student.monthly_fee ?? student.monthlyFee ?? '',
+      status: student.status || 'active',
+      archived: false,
+    });
+    setShowAddModal(true);
   };
 
   // =====================================================
@@ -226,20 +310,46 @@ export default function Students() {
   // =====================================================
 
   const handleDeleteStudent = async (studentId, studentName) => {
-    const confirmed = window.confirm(`هل أنت متأكد من حذف/أرشفة التلميذ "${studentName}"؟`);
-    if (!confirmed) return;
-
+    const student = students.find((item) => item.id === studentId) || { id: studentId, full_name: studentName };
     const updatedStudents = students.filter((student) => student.id !== studentId);
     setStudents(updatedStudents);
     saveLocalStudents(updatedStudents);
-    archiveStudent(students.find((student) => student.id === studentId) || {
-      id: studentId,
-      full_name: studentName,
-    });
+    archiveStudent(student);
+    setUndoItem(student);
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ archived: true, status: 'archived', updated_at: new Date().toISOString() })
+        .eq('id', studentId);
+      if (error) throw error;
+    } catch (error) {
+      console.warn('لم تتم مزامنة أرشفة التلميذ مع الخادم، وتم حفظها محلياً.', error);
+    }
     logActivity('أرشفة طالب', `تمت أرشفة ملف ${studentName}.`);
     if (selectedStudent && selectedStudent.id === studentId) {
       setSelectedStudent(null);
     }
+  };
+
+  const requestArchive = (studentId, studentName) => {
+    setPendingArchive({ id: studentId, name: studentName });
+  };
+
+  const undoLastArchive = async () => {
+    if (!undoItem) return;
+    undoArchiveStudent(undoItem);
+    setStudents((current) => [undoItem, ...current.filter((student) => student.id !== undoItem.id)]);
+    saveLocalStudents([undoItem, ...students.filter((student) => student.id !== undoItem.id)]);
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ archived: false, status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', undoItem.id);
+      if (error) throw error;
+    } catch (error) {
+      console.warn('تعذر التراجع عن الأرشفة على الخادم.', error);
+    }
+    setUndoItem(null);
   };
 
   // =====================================================
@@ -322,8 +432,11 @@ export default function Students() {
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
-          className="w-full md:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-600/20 transition"
+          onClick={async () => {
+            await fetchData();
+            setShowAddModal(true);
+          }}
+          className="w-full md:w-auto px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black shadow-lg shadow-orange-600/20 transition"
         >
           ➕ إضافة تلميذ جديد
         </button>
@@ -358,7 +471,7 @@ export default function Students() {
                 <div className="mt-4 space-y-2 text-sm font-bold text-slate-800">
                   <p>
                     📞 هاتف الولي:
-                    <span className="text-blue-700"> {student.parent_phone || '—'}</span>
+                    <span className="text-blue-700"> {maskPhone(student.parent_phone)}</span>
                   </p>
                   <p>🏫 المدرسة: {student.original_school || '—'}</p>
                   <p>💰 الواجب الشهري: {student.monthly_fee || 0} درهم</p>
@@ -379,7 +492,7 @@ export default function Students() {
                     📲
                   </button>
                   <button
-                    onClick={() => handleDeleteStudent(student.id, student.full_name)}
+                    onClick={() => requestArchive(student.id, student.full_name)}
                     className="px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-black text-xs"
                   >
                     🗑️
@@ -420,7 +533,7 @@ export default function Students() {
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                   <strong className="text-slate-900 block mb-1">هاتف الولي:</strong>
-                  <p className="text-slate-800">{selectedStudent.parent_phone || 'غير موجود'}</p>
+                  <p className="text-slate-800">{maskPhone(selectedStudent.parent_phone)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                   <strong className="text-slate-900 block mb-1">الواجب الشهري:</strong>
@@ -463,7 +576,13 @@ export default function Students() {
                 📲 تواصل مع الولي
               </button>
               <button
-                onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.full_name)}
+                onClick={() => openEditStudent(selectedStudent)}
+                className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-black"
+              >
+                تعديل
+              </button>
+              <button
+                onClick={() => requestArchive(selectedStudent.id, selectedStudent.full_name)}
                 className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black"
               >
                 🗑️ أرشفة
@@ -473,13 +592,36 @@ export default function Students() {
         </div>
       )}
 
+      {undoItem && (
+        <div className="fixed bottom-5 left-5 z-[10001] flex items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xl" role="status">
+          <span>تمت أرشفة التلميذ.</span>
+          <button type="button" onClick={undoLastArchive} className="rounded-lg bg-orange-500 px-3 py-1.5 text-white hover:bg-orange-600">
+            تراجع
+          </button>
+          <button type="button" aria-label="إغلاق إشعار التراجع" onClick={() => setUndoItem(null)} className="text-slate-300 hover:text-white">×</button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(pendingArchive)}
+        title="تأكيد أرشفة التلميذ"
+        message={`هل أنت متأكد من أرشفة التلميذ "${pendingArchive?.name || ''}"؟ يمكنك التراجع عن العملية مباشرة.`}
+        confirmLabel="أرشفة"
+        onCancel={() => setPendingArchive(null)}
+        onConfirm={async () => {
+          const archive = pendingArchive;
+          setPendingArchive(null);
+          await handleDeleteStudent(archive.id, archive.name);
+        }}
+      />
+
       {/* ADD STUDENT MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/70 z-[99999] flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl text-slate-900 max-h-[85vh] overflow-y-auto flex flex-col my-auto">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b bg-white rounded-t-xl shrink-0">
-              <h3 className="text-xl font-black text-slate-900">إضافة تلميذ جديد 👨‍🎓</h3>
+              <h3 className="text-xl font-black text-slate-900">{editingStudentId ? 'تعديل بيانات التلميذ' : 'إضافة تلميذ جديد'} 👨‍🎓</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -508,7 +650,7 @@ export default function Students() {
                 </div>
 
                 <div>
-                    <label className="font-bold block mb-1 text-slate-800">المستوى الدراسي</label>
+                    <label className="font-bold block mb-1 text-slate-800">المستوى الدراسي *</label>
                     <select
                       name="level_id"
                       value={formData.level_id}
@@ -521,6 +663,30 @@ export default function Students() {
                       ))}
                     </select>
                   </div>
+
+                <div>
+                  <label className="font-bold block mb-1 text-slate-800">الأستاذ *</label>
+                  <select
+                    name="teacher_id"
+                    required
+                    value={formData.teacher_id}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
+                  >
+                    <option value="">{teachers.length ? 'اختر الأستاذ' : 'لا يوجد أساتذة مسجلون'}</option>
+                    {teachers.map((teacher) => {
+                      const name = teacher.full_name || teacher.fullName || teacher.name || teacher.displayName;
+                      return (
+                        <option key={teacher.id} value={teacher.id}>
+                          {name || 'أستاذ غير مسمى'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {!teachers.length && (
+                    <p className="mt-1 text-xs font-bold text-amber-700">أضف أستاذاً من صفحة إدارة الأساتذة أولاً.</p>
+                  )}
+                </div>
 
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>
@@ -557,7 +723,7 @@ export default function Students() {
                   disabled={saving}
                   className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-black disabled:opacity-50"
                 >
-                  {saving ? 'جاري الحفظ...' : 'حفظ التلميذ ✅'}
+                  {saving ? 'جاري الحفظ...' : editingStudentId ? 'حفظ التعديلات ✅' : 'حفظ التلميذ ✅'}
                 </button>
                 <button
                   type="button"

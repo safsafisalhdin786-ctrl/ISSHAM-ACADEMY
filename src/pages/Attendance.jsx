@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
 import { logActivity, readAttendanceHistory, saveAttendanceHistory } from '../utils/localHistory';
 import { useAuth } from '../context/AuthContext';
+import { useStudents } from '../context/StudentsContext';
 
 export default function Attendance() {
   const { userRole = 'admin', currentUser = null } = useAuth();
 
-  const [students, setStudents] = useState([]);
+  const { students, setStudents } = useStudents();
   const [teachers, setTeachers] = useState([]);
   const [attendance, setAttendance] = useState({});
 
@@ -109,7 +110,6 @@ export default function Attendance() {
             user_id,
             status
           `)
-          .eq('status', 'active')
           .order('full_name');
 
       if (teachersError) {
@@ -192,7 +192,7 @@ export default function Attendance() {
               'عام',
 
             teacherId:
-              null,
+              student.teacher_id || student.teacherId || null,
           };
         }
       );
@@ -217,11 +217,13 @@ export default function Attendance() {
 
           teacherId:
             attendanceTeacherMap[student.id] ||
+            student.teacherId ||
+            student.teacher_id ||
             null,
         }));
 
       setStudents(finalStudents);
-      setTeachers(teachersData || []);
+      setTeachers((teachersData || []).filter((teacher) => teacher.status !== 'inactive'));
 
       // -------------------------------------------------
       // ATTENDANCE MAP
@@ -263,7 +265,7 @@ export default function Attendance() {
         level: student.academic_level || student.level || 'غير محدد',
         levelId: student.level_id || null,
         className: 'عام',
-        teacherId: null,
+        teacherId: student.teacher_id || student.teacherId || null,
       })));
       setTeachers([]);
       setAttendance(Object.fromEntries(history.map((record) => [record.student_id, record.status])));
@@ -271,7 +273,7 @@ export default function Attendance() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, setStudents]);
 
   // =====================================================
   // LOAD
@@ -422,7 +424,12 @@ export default function Attendance() {
           timestamp: new Date().toISOString(),
         })));
         records.forEach((record) => {
-          logActivity('تسجيل حضور', `تم تسجيل حضور الطالب في تاريخ ${record.attendance_date}.`);
+          logActivity('attendance_saved', {
+            message: `تم تسجيل حضور الطالب في تاريخ ${record.attendance_date}.`,
+            studentId: record.student_id,
+            date: record.attendance_date,
+            status: record.status,
+          });
         });
 
         for (const record of records) {
@@ -657,7 +664,7 @@ export default function Attendance() {
               saving ||
               filteredStudents.length === 0
             }
-            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-md text-sm disabled:opacity-50"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-extrabold rounded-lg shadow-md text-sm disabled:opacity-50"
           >
             {saving
               ? 'جاري الحفظ...'

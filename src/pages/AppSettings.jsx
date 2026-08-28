@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { maskEmail } from '../utils/security';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
 
@@ -44,6 +46,7 @@ export default function AppSettings() {
 
   const [adminEmails, setAdminEmails] = useState([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [pendingAdminRemoval, setPendingAdminRemoval] = useState(null);
 
   // ==========================================
   // Synchronize Context → Form
@@ -160,15 +163,7 @@ export default function AppSettings() {
   // REMOVE ADMIN EMAIL
   // ==========================================
 
-  const handleRemoveAdmin = async (
-    emailToRemove
-  ) => {
-    const confirmed = window.confirm(
-      `هل أنت متأكد من إزالة ${emailToRemove} من قائمة المشرفين؟`
-    );
-
-    if (!confirmed) return;
-
+  const handleRemoveAdmin = async (emailToRemove) => {
     try {
       setSaving(true);
       setMessage('');
@@ -501,7 +496,7 @@ export default function AppSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving
                 ? 'جاري الحفظ...'
@@ -554,7 +549,7 @@ export default function AppSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving
                 ? 'جاري الحفظ...'
@@ -586,16 +581,12 @@ export default function AppSettings() {
                     >
 
                       <span className="font-bold text-slate-800 flex items-center gap-2">
-                        👤 {email}
+                        👤 {maskEmail(email)}
                       </span>
 
                       <button
                         type="button"
-                        onClick={() =>
-                          handleRemoveAdmin(
-                            email
-                          )
-                        }
+                        onClick={() => setPendingAdminRemoval(email)}
                         disabled={saving}
                         className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-md border border-rose-200 text-xs font-bold transition disabled:opacity-50"
                       >
@@ -758,7 +749,7 @@ export default function AppSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving
                 ? 'جاري الحفظ...'
@@ -769,6 +760,20 @@ export default function AppSettings() {
 
         </form>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingAdminRemoval)}
+        title="تأكيد إزالة صلاحية المشرف"
+        message={`هل أنت متأكد من إزالة ${maskEmail(pendingAdminRemoval || '')} من قائمة المشرفين؟`}
+        confirmLabel="إزالة الصلاحية"
+        busy={saving}
+        onCancel={() => setPendingAdminRemoval(null)}
+        onConfirm={async () => {
+          const email = pendingAdminRemoval;
+          setPendingAdminRemoval(null);
+          await handleRemoveAdmin(email);
+        }}
+      />
 
     </div>
   );
