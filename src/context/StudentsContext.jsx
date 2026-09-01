@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
+import logger from '../utils/logger';
 
 export const normalizeStudent = (student) => ({
   ...student,
@@ -35,7 +36,7 @@ export function StudentsProvider({ children }) {
         .eq('archived', false)
         .order('full_name', { ascending: true });
       if (error) {
-        console.error('Central students loading error:', error);
+        logger.error('StudentsContext', error);
         return;
       }
       if (active) setStudentsState((data || []).map(normalizeStudent));

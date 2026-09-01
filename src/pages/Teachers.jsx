@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
+import logger from '../utils/logger';
 
 const SUBJECTS_LIST = [
   'الرياضيات',
@@ -47,7 +48,7 @@ export default function Teachers() {
       }));
       setTeachers(teachersList);
     } catch (error) {
-      console.error("خطأ في جلب البيانات:", error);
+      logger.error('Teachers.fetchData', error);
     } finally {
       setLoading(false);
     }
@@ -64,11 +65,9 @@ export default function Teachers() {
     try {
       const payload = {
         full_name: form.fullName.trim(),
-        name: form.fullName.trim(),
         subject: form.subject,
         phone: form.phone.trim(),
         salary: form.salary ? Number(form.salary) : 0,
-        updated_at: new Date().toISOString(),
         status: 'active',
       };
 
@@ -85,7 +84,7 @@ export default function Teachers() {
       setShowAddForm(false);
       fetchData();
     } catch (error) {
-      console.error("خطأ في الحفظ:", error);
+      logger.error('Teachers.save', error);
     } finally {
       setSaving(false);
     }
@@ -115,13 +114,12 @@ export default function Teachers() {
     try {
       const { error } = await supabase.from('teachers').update({
         status: 'inactive',
-        updated_at: new Date().toISOString(),
       }).eq('id', deleteModal.id);
       if (error) throw error;
       setDeleteModal({ show: false, id: null, name: '' });
       fetchData();
     } catch (error) {
-      console.error("خطأ في الحذف:", error);
+      logger.error('Teachers.delete', error);
     } finally {
       setDeleting(false);
     }

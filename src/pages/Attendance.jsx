@@ -3,6 +3,7 @@ import { Clock3, UserCheck, UserX, UserRoundCog, Users } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 import { useStudents } from '../context/StudentsContext';
+import logger from '../utils/logger';
 
 export default function Attendance() {
   const { userRole = 'admin', currentUser = null } = useAuth();
@@ -42,7 +43,6 @@ export default function Attendance() {
           .select(`
             id,
             full_name,
-            parent_name,
             parent_phone,
             parent_whatsapp,
             level_id,
@@ -252,10 +252,7 @@ export default function Attendance() {
       setAttendance(initialAttendance);
 
     } catch (error) {
-      console.error(
-        'خطأ في جلب بيانات الحضور:',
-        error
-      );
+      logger.error('Attendance', error);
 
       setErrorMessage(`تعذر تحميل بيانات الحضور المركزية: ${error.message || 'خطأ غير معروف'}`);
 
@@ -482,10 +479,7 @@ export default function Attendance() {
 
       } catch (error) {
 
-        console.error(
-          'خطأ في حفظ الحضور:',
-          error
-        );
+        logger.error('Attendance', error);
 
         setErrorMessage('');
 

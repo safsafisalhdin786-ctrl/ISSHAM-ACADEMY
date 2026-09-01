@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
 import { useStudents } from '../context/StudentsContext';
+import logger from '../utils/logger';
 
 export default function Financials() {
   const { students } = useStudents();
@@ -31,7 +32,7 @@ export default function Financials() {
         paidAt: payment.paid_at || payment.paidAt,
       })));
     } catch (err) {
-      console.error('خطأ في جلب البيانات:', err);
+      logger.error('Financials.fetchData', err);
       setPayments([]);
     } finally {
       setLoading(false);
@@ -68,7 +69,7 @@ export default function Financials() {
       if (error) throw error;
       await fetchData();
     } catch (err) {
-      console.error('خطأ في تسجيل الأداء:', err);
+      logger.error('Financials.handleMarkAsPaid', err);
     }
   };
 

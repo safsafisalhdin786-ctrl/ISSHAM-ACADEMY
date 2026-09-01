@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { maskEmail } from '../utils/security';
 import ConfirmDialog from '../components/ConfirmDialog';
+import logger from '../utils/logger';
 
 const defaultLogoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
 
@@ -93,10 +94,7 @@ export default function AppSettings() {
         'تم حفظ التغييرات وتطبيقها فوراً في الموقع كامل! ✅'
       );
     } catch (error) {
-      console.error(
-        'خطأ في حفظ الإعدادات:',
-        error
-      );
+      logger.error('AppSettings', error);
 
       setMessage(
         'حدث خطأ أثناء حفظ الإعدادات ❌'
@@ -146,10 +144,7 @@ export default function AppSettings() {
         `تمت إضافة ${email} إلى قائمة المشرفين ✅`
       );
     } catch (error) {
-      console.error(
-        'خطأ في إضافة المشرف:',
-        error
-      );
+      logger.error('AppSettings', error);
 
       setMessage(
         'حدث خطأ أثناء إضافة المشرف ❌'
@@ -184,10 +179,7 @@ export default function AppSettings() {
         `تمت إزالة ${emailToRemove} من قائمة المشرفين ✅`
       );
     } catch (error) {
-      console.error(
-        'خطأ في حذف المشرف:',
-        error
-      );
+      logger.error('AppSettings', error);
 
       setMessage(
         'حدث خطأ أثناء حذف المشرف ❌'

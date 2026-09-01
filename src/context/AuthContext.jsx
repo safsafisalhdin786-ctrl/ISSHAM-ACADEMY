@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import { auth, db } from '../firebase';
+import logger from '../utils/logger';
 
 import {
   onAuthStateChanged,
@@ -205,10 +206,7 @@ export const AuthProvider = ({ children }) => {
           // ==========================================
 
           if (!role) {
-            console.warn(
-              'Authenticated user has no assigned role:',
-              user.uid
-            );
+            logger.warn('AuthContext', `Authenticated user has no assigned role: ${user.uid}`);
 
             if (!mounted) return;
 
@@ -238,10 +236,7 @@ export const AuthProvider = ({ children }) => {
           setAuthError(null);
 
         } catch (error) {
-          console.error(
-            'خطأ في التحقق من صلاحيات المستخدم:',
-            error
-          );
+          logger.error('AuthContext', error);
 
           if (!mounted) return;
 

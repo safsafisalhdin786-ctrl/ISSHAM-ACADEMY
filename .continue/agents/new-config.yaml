@@ -1,36 +1,9 @@
-# This is an example configuration file
-# To learn more, see the full config.yaml reference: https://docs.continue.dev/reference
-
-name: Example Config
+name: Main Config
 version: 1.0.0
 schema: v1
-
-# Define which models can be used
-# https://docs.continue.dev/customization/models
 models:
-  - name: my gpt-5
-    provider: openai
-    model: gpt-5
-    apiKey: YOUR_OPENAI_API_KEY_HERE
-  - name: qwen2.5-coder 7b
-    provider: ollama
-    model: qwen2.5-coder:7b
-    roles:
-      - apply
-      - autocomplete
-      - chat
-      - edit
-  - name: Claude 4 Sonnet
-    provider: anthropic
-    model: claude-sonnet-4-20250514
-    apiKey: ${{ secrets.ANTHROPIC_API_KEY }}
-    roles:
-      - chat
-      - edit
-      - apply
-    defaultCompletionOptions:
-      contextLength: 200000
-      maxTokens: 64000
-    capabilities:
-      - tool_use
-      - image_input
+  - name: Gemini 3.7 Flash
+    provider: gemini
+    model: gemini-3.7-flash
+    apiKey: AIzaSyAy08GkGWRl-jMDArwZt1X5QoZuaDW_73c
+    contextLength: 1000000

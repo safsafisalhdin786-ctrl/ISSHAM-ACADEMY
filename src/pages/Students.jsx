@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import { useStudents } from '../context/StudentsContext';
+import logger from '../utils/logger';
 
 const MOROCCAN_LEVELS = [
   'الأول ابتدائي',
@@ -98,7 +99,7 @@ export default function Students() {
       }
       setErrorMessage(notices.join(' '));
     } catch (error) {
-      console.error('Students loading error:', error);
+      logger.error('Students.fetchData', error);
       setTeachers([]);
       setErrorMessage(`تعذر تحميل بيانات التلاميذ من قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     } finally {
@@ -231,7 +232,7 @@ export default function Students() {
       setShowAddModal(false);
       resetForm();
     } catch (error) {
-      console.error('Student teacher relationship save failed:', error);
+      logger.error('Students.save', error);
       setErrorMessage(`تعذر حفظ التلميذ وعلاقة الأستاذ في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setSaving(false);
@@ -262,13 +263,13 @@ export default function Students() {
     try {
       const { error } = await supabase
         .from('students')
-        .update({ archived: true, status: 'archived', updated_at: new Date().toISOString() })
+        .update({ archived: true, status: 'archived' })
         .eq('id', studentId);
       if (error) throw error;
       const updatedStudents = students.filter((item) => item.id !== studentId);
       setStudents(updatedStudents);
     } catch (error) {
-      console.error('Student archive failed:', error);
+      logger.error('Students.archive', error);
       setErrorMessage(`تعذر أرشفة التلميذ في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
       return;
     }
@@ -302,7 +303,6 @@ export default function Students() {
         .from('students')
         .update({
           notes: updatedNotes,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', selectedStudent.id)
         .select('*')
@@ -318,7 +318,7 @@ export default function Students() {
       setNewComment('');
       await fetchData();
     } catch (error) {
-      console.error('Comment save error:', error);
+      logger.error('Students.comment', error);
       setErrorMessage(`تعذر حفظ الملاحظة في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     }
   };

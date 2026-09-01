@@ -1,4 +1,5 @@
 import React from 'react';
+import logger from '../utils/logger';
 
 export default class ErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -8,7 +9,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error) {
-    console.error('Application rendering error:', error);
+    logger.error('ErrorBoundary', error);
   }
 
   render() {

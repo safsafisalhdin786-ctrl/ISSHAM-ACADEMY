@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStudents } from '../context/StudentsContext';
 import { supabase } from '../supabase';
+import logger from '../utils/logger';
 
 const formatDate = (value) =>
   new Date(value).toLocaleString('ar-MA', {
@@ -23,7 +24,7 @@ export default function Archive() {
     let mounted = true;
     const loadArchive = async () => {
       const [{ data: archivedStudents, error: studentsError }, { data: attendanceRows, error: attendanceError }, { data: teacherRows, error: teachersError }] = await Promise.all([
-        supabase.from('students').select('*').eq('archived', true).order('updated_at', { ascending: false }),
+        supabase.from('students').select('*').eq('archived', true).order('id', { ascending: false }),
         supabase.from('attendance').select('*').order('date', { ascending: false }),
         supabase.from('teachers').select('id, full_name'),
       ]);
@@ -37,7 +38,7 @@ export default function Archive() {
       }
     };
     void loadArchive().catch((error) => {
-      console.error('تعذر تحميل الأرشيف المركزي.', error);
+      logger.error('Archive', error);
       if (mounted) setErrorMessage(`تعذر تحميل الأرشيف: ${error.message || 'خطأ غير معروف'}`);
     });
     const channel = supabase
@@ -89,7 +90,7 @@ export default function Archive() {
     try {
       const { data, error } = await supabase
         .from('students')
-        .update({ archived: false, status: 'active', updated_at: new Date().toISOString() })
+        .update({ archived: false, status: 'active' })
         .eq('id', id)
         .select('*')
         .single();
@@ -98,7 +99,7 @@ export default function Archive() {
       setArchived((current) => current.filter((item) => item.id !== id));
       setStudents((current) => [...current.filter((item) => item.id !== id), { ...data, archived: false, status: 'active' }]);
     } catch (error) {
-      console.error('Student restore failed:', error);
+      logger.error('Archive.restore', error);
       setErrorMessage(`تعذر استعادة التلميذ: ${error.message || 'خطأ غير معروف'}`);
     }
   };

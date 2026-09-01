@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import logger from './utils/logger';
 
 const configuredUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const configuredKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -8,9 +9,7 @@ const hasValidConfig =
   !configuredKey.includes('xxxx');
 
 if (!hasValidConfig) {
-  console.warn(
-    'Supabase is not configured. Add valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values to enable Supabase-backed pages.'
-  );
+logger.warn('Supabase', 'Supabase is not configured. Add valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values to enable Supabase-backed pages.');
 }
 
 export const supabase = createClient(

@@ -6,6 +6,7 @@ import React, {
 } from 'react';
 
 import { db } from '../firebase';
+import logger from '../utils/logger';
 
 import {
   doc,
@@ -120,24 +121,18 @@ export function SettingsProvider({ children }) {
           setSettingsError(null);
           setLoading(false);
         } catch (error) {
-          console.error(
-            'خطأ أثناء معالجة إعدادات الأكاديمية:',
-            error
-          );
+        logger.error('SettingsContext', error);
 
-          setSettings(readLocalSettings());
-          setSettingsError(
-            'تعذر معالجة إعدادات الأكاديمية.'
-          );
-          setLoading(false);
+        setSettings(readLocalSettings());
+        setSettingsError(
+          'تعذر معالجة إعدادات الأكاديمية.'
+        );
+        setLoading(false);
         }
       },
 
       (error) => {
-        console.error(
-          'خطأ في جلب إعدادات الأكاديمية:',
-          error
-        );
+        logger.error('SettingsContext', error);
 
         setSettingsError(
           'تعذر تحميل إعدادات الأكاديمية.'
@@ -185,10 +180,7 @@ export function SettingsProvider({ children }) {
 
       return updatedSettings;
     } catch (error) {
-      console.error(
-        'خطأ أثناء تحديث إعدادات الأكاديمية:',
-        error
-      );
+      logger.error('SettingsContext', error);
 
       setSettingsError(
         'تعذر حفظ إعدادات الأكاديمية.'

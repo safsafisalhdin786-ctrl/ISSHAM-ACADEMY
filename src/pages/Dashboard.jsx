@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
+import logger from '../utils/logger';
 import {
   Activity,
   ArrowLeft,
@@ -96,7 +97,7 @@ export default function Dashboard() {
           });
         }
       } catch (error) {
-        console.error('تعذر تحميل بيانات لوحة التحكم المركزية.', error);
+        logger.error('Dashboard', error);
       }
     };
     load();

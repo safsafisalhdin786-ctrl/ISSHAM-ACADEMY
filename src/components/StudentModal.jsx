@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
+import logger from '../utils/logger';
 
 export default function StudentProfileModal({ student, onClose }) {
   const [activeTab, setActiveTab] = useState('info');
@@ -61,10 +62,7 @@ export default function StudentProfileModal({ student, onClose }) {
         setAttendanceRecords(attendance);
         setPaymentRecords(payments);
       } catch (err) {
-        console.error(
-          'خطأ في جلب سجلات التلميذ:',
-          err
-        );
+        logger.error('StudentModal', err);
 
         if (!cancelled) {
           setAttendanceRecords([]);

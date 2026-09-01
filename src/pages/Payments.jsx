@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { useStudents } from '../context/StudentsContext';
 import ConfirmDialog from '../components/ConfirmDialog';
+import logger from '../utils/logger';
 
 export default function Payments() {
   const { students, setStudents } = useStudents();
@@ -49,7 +50,7 @@ export default function Payments() {
         createdAt: payment.created_at || payment.createdAt,
       })));
     } catch (e) {
-      console.error("خطأ في جلب البيانات:", e);
+      logger.error('Payments.fetchData', e);
       setPayments([]);
     } finally {
       setLoading(false);
@@ -118,7 +119,7 @@ export default function Payments() {
         item.id === student.id ? { ...item, paymentStatus: 'paid' } : item
       )));
     } catch (error) {
-      console.error("خطأ في تسجيل الأداء:", error);
+      logger.error('Payments.register', error);
       setPrintedReceipt(null);
       alert(`تعذر حفظ الأداء في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
     }
@@ -131,7 +132,7 @@ export default function Payments() {
         if (error) throw error;
         setPayments(prev => prev.filter(p => p.id !== paymentId));
       } catch (error) {
-        console.error("خطأ أثناء حذف الوصل:", error);
+      logger.error('Payments.delete', error);
         alert("حدث خطأ أثناء عملية الحذف");
       }
   };
