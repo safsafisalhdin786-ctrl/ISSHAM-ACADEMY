@@ -12,12 +12,18 @@ export const normalizeStudent = (student) => ({
   monthlyFee: student.monthlyFee ?? student.monthly_fee ?? 0,
   academic_level: student.academic_level || student.level || '',
   level: student.level || student.academic_level || '',
+  teacher_id: student.teacher_id || student.teacherId || null,
+  teacherId: student.teacherId || student.teacher_id || null,
+  school: student.school || student.original_school
+    || String(student.notes || '').match(/(?:^|\n)المدرسة:\s*(.+)/)?.[1]?.trim()
+    || '',
 });
 
 const StudentsContext = createContext(null);
 
 export function StudentsProvider({ children }) {
   const [students, setStudentsState] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
 
   const setStudents = useCallback((next) => {
@@ -37,9 +43,13 @@ export function StudentsProvider({ children }) {
         .order('full_name', { ascending: true });
       if (error) {
         logger.error('StudentsContext', error);
+        if (active) setStudentsLoading(false);
         return;
       }
-      if (active) setStudentsState((data || []).map(normalizeStudent));
+      if (active) {
+        setStudentsState((data || []).map(normalizeStudent));
+        setStudentsLoading(false);
+      }
     };
     void loadStudents();
     const channel = supabase
@@ -52,7 +62,12 @@ export function StudentsProvider({ children }) {
     };
   }, [refreshToken]);
 
-  const value = useMemo(() => ({ students, setStudents, refreshStudents: () => setRefreshToken((token) => token + 1) }), [students, setStudents]);
+  const value = useMemo(() => ({
+    students,
+    studentsLoading,
+    setStudents,
+    refreshStudents: () => setRefreshToken((token) => token + 1),
+  }), [students, studentsLoading, setStudents]);
   return <StudentsContext.Provider value={value}>{children}</StudentsContext.Provider>;
 }
 

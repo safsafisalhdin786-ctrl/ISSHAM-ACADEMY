@@ -4,24 +4,26 @@
 
 export function error(tag, err) {
   try {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error(`[${tag}]`, err);
     } else {
       // Avoid printing full stack or sensitive payloads in production
       const message = err && (err.message || String(err)) ? (err.message || String(err)) : 'Unknown error';
       console.error(`[${tag}] ${message}`);
     }
-  } catch (e) {
+  } catch {
     // swallow logging errors
   }
 }
 
 export function warn(tag, msg) {
   try {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.warn(`[${tag}]`, msg);
     }
-  } catch (e) {}
+  } catch {
+    // Logging must never interrupt the user flow.
+  }
 }
 
 export default { error, warn };

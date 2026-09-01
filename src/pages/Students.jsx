@@ -25,6 +25,18 @@ const LEVEL_OPTIONS = MOROCCAN_LEVELS.map((name_ar) => ({
   name_ar,
 }));
 
+const normalizeTeacher = (teacher) => {
+  try {
+    const details = typeof teacher.subject === 'string' ? JSON.parse(teacher.subject) : teacher.subject;
+    if (details && typeof details === 'object' && Array.isArray(details.subjects)) {
+      return { ...teacher, subjects: details.subjects, levels: details.levels || [] };
+    }
+  } catch {
+    // Legacy records use a plain subject value.
+  }
+  return { ...teacher, subjects: teacher.subject ? [teacher.subject] : [], levels: teacher.levels || [] };
+};
+
 export default function Students() {
   const { students, setStudents } = useStudents();
   const [teachers, setTeachers] = useState([]);
@@ -43,9 +55,13 @@ export default function Students() {
   const [searchKeyword, setSearchKeyword] = useState('');
 
   const [formData, setFormData] = useState({
-    full_name: '',
+    first_name: '',
+    last_name: '',
     level_id: '',
     teacher_id: '',
+    teacher_search: '',
+    subjects: [],
+    original_school: '',
     parent_phone: '',
     parent_whatsapp: '',
     monthly_fee: '',
@@ -89,7 +105,9 @@ export default function Students() {
         setTeachers([]);
         notices.push(`تعذر تحميل قائمة الأساتذة: ${teachersResult.error.message || 'خطأ غير معروف'}`);
       } else {
-        setTeachers((teachersResult.data || []).filter((teacher) => teacher.status !== 'inactive'));
+        setTeachers((teachersResult.data || [])
+          .filter((teacher) => teacher.status !== 'inactive')
+          .map(normalizeTeacher));
       }
       if (levelsResult.error && levelsResult.error.code !== 'PGRST116') {
         setLevels(LEVEL_OPTIONS);
@@ -138,24 +156,51 @@ export default function Students() {
     return 'غير محدد';
   };
 
+  const getStudentSchool = (student) => {
+    if (student.original_school || student.school) return student.original_school || student.school;
+    const match = String(student.notes || '').match(/(?:^|\n)المدرسة:\s*(.+)/);
+    return match?.[1]?.trim() || '—';
+  };
+
   // =====================================================
   // FORM
   // =====================================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'teacher_search') {
+      const selectedTeacher = teachers.find((teacher) => {
+        const teacherName = teacher.full_name || teacher.fullName || teacher.name || teacher.displayName;
+        return teacherName === value;
+      });
+      setFormData((prev) => ({
+        ...prev,
+        teacher_search: value,
+        teacher_id: selectedTeacher?.id || '',
+        subjects: selectedTeacher?.subjects || [],
+      }));
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === 'level_id' ? { teacher_id: '', teacher_search: '', subjects: [] } : {}),
+      ...(name === 'teacher_id'
+        ? { subjects: teachers.find((teacher) => String(teacher.id) === String(value))?.subjects || [] }
+        : {}),
     }));
   };
 
   const resetForm = () => {
     setEditingStudentId(null);
     setFormData({
-      full_name: '',
+      first_name: '',
+      last_name: '',
       level_id: '',
       teacher_id: '',
+      teacher_search: '',
+      subjects: [],
+      original_school: '',
       parent_phone: '',
       parent_whatsapp: '',
       monthly_fee: '',
@@ -171,7 +216,11 @@ export default function Students() {
   const handleAddStudent = async (e) => {
     e.preventDefault();
 
-    if (!formData.full_name.trim()) {
+    const firstName = formData.first_name.trim();
+    const lastName = formData.last_name.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (!firstName || !lastName) {
       alert('المرجو إدخال اسم التلميذ.');
       return;
     }
@@ -186,11 +235,27 @@ export default function Students() {
       return;
     }
 
+    const duplicate = students.some((student) => (
+      student.id !== editingStudentId
+      && String(student.full_name || '').trim().toLowerCase() === fullName.toLowerCase()
+      && String(student.parent_phone || '').replace(/\D/g, '') === formData.parent_phone.replace(/\D/g, '')
+    ));
+    if (duplicate) {
+      setErrorMessage('هذا التلميذ مسجل مسبقاً بنفس الاسم ورقم الهاتف.');
+      return;
+    }
+
+    const monthlyFee = formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee);
+    if (!Number.isFinite(monthlyFee) || monthlyFee < 0) {
+      setErrorMessage('المرجو إدخال واجب شهري صحيح وغير سالب.');
+      return;
+    }
+
     setSaving(true);
     setErrorMessage('');
 
     const payload = {
-      full_name: formData.full_name.trim(),
+      full_name: fullName,
       level_id: levels.some((level) => String(level.id) === String(formData.level_id))
         ? formData.level_id
         : null,
@@ -200,7 +265,7 @@ export default function Students() {
       teacher_id: formData.teacher_id || null,
       parent_phone: formData.parent_phone.trim(),
       parent_whatsapp: formData.parent_whatsapp.trim() || formData.parent_phone.trim(),
-      monthly_fee: formData.monthly_fee === '' ? 0 : Number(formData.monthly_fee),
+      monthly_fee: monthlyFee,
       status: 'active',
       archived: false,
     };
@@ -210,6 +275,7 @@ export default function Students() {
         full_name: payload.full_name,
         level_id: payload.level_id,
         teacher_id: payload.teacher_id,
+        ...(editingStudentId ? {} : { notes: `المدرسة: ${formData.original_school.trim()}` }),
         parent_phone: payload.parent_phone,
         parent_whatsapp: payload.parent_whatsapp,
         monthly_fee: payload.monthly_fee,
@@ -243,9 +309,13 @@ export default function Students() {
     setSelectedStudent(null);
     setEditingStudentId(student.id);
     setFormData({
-      full_name: student.full_name || student.fullName || '',
+      first_name: (student.full_name || student.fullName || '').trim().split(/\s+/)[0] || '',
+      last_name: (student.full_name || student.fullName || '').trim().split(/\s+/).slice(1).join(' '),
       level_id: student.level_id || student.academic_level || '',
       teacher_id: student.teacher_id || student.teacherId || '',
+      teacher_search: getTeacherForStudent(student) === 'غير محدد' ? '' : getTeacherForStudent(student),
+      subjects: Array.isArray(student.subjects) ? student.subjects : [],
+      original_school: getStudentSchool(student) === '—' ? '' : getStudentSchool(student),
       parent_phone: student.parent_phone || student.parentPhone || '',
       parent_whatsapp: student.parent_whatsapp || student.parentWhatsapp || '',
       monthly_fee: student.monthly_fee ?? student.monthlyFee ?? '',
@@ -376,10 +446,7 @@ export default function Students() {
           </p>
         </div>
         <button
-          onClick={async () => {
-            await fetchData();
-            setShowAddModal(true);
-          }}
+          onClick={() => setShowAddModal(true)}
           className="w-full md:w-auto px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black shadow-lg shadow-orange-600/20 transition"
         >
           ➕ إضافة تلميذ جديد
@@ -455,7 +522,7 @@ export default function Students() {
                     📞 هاتف الولي:
                     <span className="text-blue-700"> {maskPhone(student.parent_phone)}</span>
                   </p>
-                  <p>🏫 المدرسة: {student.original_school || '—'}</p>
+                  <p>🏫 المدرسة: {getStudentSchool(student)}</p>
                   <p>💰 الواجب الشهري: {student.monthly_fee || 0} درهم</p>
                   <p>👨‍🏫 الأستاذ: {getTeacherForStudent(student)}</p>
                 </div>
@@ -609,21 +676,35 @@ export default function Students() {
             {/* Modal Body - Scrollable */}
             <form onSubmit={handleAddStudent} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                <div>
-                  <label className="font-bold block mb-1 text-slate-800">الاسم الكامل *</label>
-                  <input
-                    name="full_name"
-                    required
-                    value={formData.full_name}
-                    onChange={handleChange}
-                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                    placeholder="مثال: محمد العلمي"
-                  />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="font-bold block mb-1 text-slate-800">الاسم *</label>
+                    <input
+                      name="first_name"
+                      required
+                      value={formData.first_name}
+                      onChange={handleChange}
+                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
+                      placeholder="محمد"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold block mb-1 text-slate-800">النسب *</label>
+                    <input
+                      name="last_name"
+                      required
+                      value={formData.last_name}
+                      onChange={handleChange}
+                      className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
+                      placeholder="العلمي"
+                    />
+                  </div>
                 </div>
 
                 <div>
                     <label className="font-bold block mb-1 text-slate-800">المستوى الدراسي *</label>
                     <select
+                      required
                       name="level_id"
                       value={formData.level_id}
                       onChange={handleChange}
@@ -636,28 +717,59 @@ export default function Students() {
                     </select>
                   </div>
 
-                <div>
+                 <div>
                   <label className="font-bold block mb-1 text-slate-800">الأستاذ *</label>
-                  <select
-                    name="teacher_id"
+                  <input
+                    name="teacher_search"
                     required
-                    value={formData.teacher_id}
+                    list="student-teachers"
+                    value={formData.teacher_search}
                     onChange={handleChange}
                     className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
-                  >
-                    <option value="">{teachers.length ? 'اختر الأستاذ' : 'لا يوجد أساتذة مسجلون'}</option>
-                    {teachers.map((teacher) => {
+                    placeholder={teachers.length ? 'ابحث واختر الأستاذ' : 'لا يوجد أساتذة مسجلون'}
+                  />
+                  <datalist id="student-teachers">
+                    {teachers.filter((teacher) => {
+                      const assignedLevels = Array.isArray(teacher.levels)
+                        ? teacher.levels
+                        : [];
+                      const selectedLevel = levels.find((level) => String(level.id) === String(formData.level_id));
+                      const selectedLevelNames = [formData.level_id, selectedLevel?.name_ar].filter(Boolean).map(String);
+                      return !formData.level_id || !assignedLevels.length
+                        || assignedLevels.map(String).some((level) => selectedLevelNames.includes(level));
+                    }).map((teacher) => {
                       const name = teacher.full_name || teacher.fullName || teacher.name || teacher.displayName;
-                      return (
-                        <option key={teacher.id} value={teacher.id}>
-                          {name || 'أستاذ غير مسمى'}
-                        </option>
-                      );
+                      return <option key={teacher.id} value={name || 'أستاذ غير مسمى'} />;
                     })}
-                  </select>
+                  </datalist>
                   {!teachers.length && (
                     <p className="mt-1 text-xs font-bold text-amber-700">أضف أستاذاً من صفحة إدارة الأساتذة أولاً.</p>
                   )}
+                </div>
+
+                {formData.teacher_id && formData.subjects.length > 0 && (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                    <p className="mb-2 text-xs font-black text-blue-900">المواد المتاحة مع هذا الأستاذ</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.subjects.map((subject) => (
+                        <span key={subject} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-800 shadow-sm">
+                          {subject}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="font-bold block mb-1 text-slate-800">المدرسة التي يدرس فيها *</label>
+                  <input
+                    name="original_school"
+                    required
+                    value={formData.original_school}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 border-slate-300 rounded-lg bg-white text-slate-900"
+                    placeholder="اسم المدرسة"
+                  />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-3">

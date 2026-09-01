@@ -8,9 +8,10 @@ import logger from '../utils/logger';
 export default function Attendance() {
   const { userRole = 'admin', currentUser = null } = useAuth();
 
-  const { students, setStudents } = useStudents();
+  const { students, studentsLoading } = useStudents();
   const [teachers, setTeachers] = useState([]);
   const [attendance, setAttendance] = useState({});
+  const [enrichedStudents, setEnrichedStudents] = useState([]);
 
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -33,32 +34,6 @@ export default function Attendance() {
     setErrorMessage('');
 
     try {
-      // -------------------------------------------------
-      // GET STUDENTS (تم إزالة first_name و last_name من الاستعلام لتفادي الخطأ)
-      // -------------------------------------------------
-
-      const { data: studentsData, error: studentsError } =
-        await supabase
-          .from('students')
-          .select(`
-            id,
-            full_name,
-            parent_phone,
-            parent_whatsapp,
-            level_id,
-            class_id,
-            teacher_id,
-            status,
-            archived
-          `)
-          .eq('status', 'active')
-          .or('archived.is.null,archived.eq.false')
-          .order('full_name', { ascending: true });
-
-      if (studentsError) {
-        throw studentsError;
-      }
-
       // -------------------------------------------------
       // GET LEVELS
       // -------------------------------------------------
@@ -144,10 +119,6 @@ export default function Attendance() {
         throw attendanceError;
       }
 
-      // -------------------------------------------------
-      // MAP LEVELS
-      // -------------------------------------------------
-
       const levelsMap = {};
 
       (levelsData || []).forEach((level) => {
@@ -164,11 +135,7 @@ export default function Attendance() {
         classesMap[classItem.id] = classItem;
       });
 
-      // -------------------------------------------------
-      // FORMAT STUDENTS
-      // -------------------------------------------------
-
-      const formattedStudents = (studentsData || []).map(
+      const formattedStudents = students.map(
         (student) => {
 
           const level =
@@ -212,8 +179,7 @@ export default function Attendance() {
         }
       });
 
-      const finalStudents =
-        formattedStudents.map((student) => ({
+      const finalStudents = formattedStudents.map((student) => ({
           ...student,
 
           teacherId:
@@ -223,8 +189,8 @@ export default function Attendance() {
             null,
         }));
 
-      setStudents(finalStudents);
       setTeachers((teachersData || []).filter((teacher) => teacher.status !== 'inactive'));
+      setEnrichedStudents(finalStudents);
 
       // -------------------------------------------------
       // ATTENDANCE MAP
@@ -259,15 +225,15 @@ export default function Attendance() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, setStudents]);
+  }, [selectedDate, students]);
 
   // =====================================================
   // LOAD
   // =====================================================
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!studentsLoading) fetchData();
+  }, [fetchData, studentsLoading]);
 
   // =====================================================
   // CHANGE STATUS
@@ -288,7 +254,7 @@ export default function Attendance() {
   // =====================================================
 
   const filteredStudents =
-    students.filter((student) => {
+    enrichedStudents.filter((student) => {
 
       // Teacher filter
       if (
@@ -592,7 +558,7 @@ export default function Attendance() {
   // LOADING
   // =====================================================
 
-  if (loading) {
+  if (loading || studentsLoading) {
     return (
       <div className="p-8 text-center text-slate-700 font-bold dir-rtl">
         جاري تحميل قائمة التلاميذ...

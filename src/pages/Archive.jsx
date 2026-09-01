@@ -3,11 +3,15 @@ import { useStudents } from '../context/StudentsContext';
 import { supabase } from '../supabase';
 import logger from '../utils/logger';
 
-const formatDate = (value) =>
-  new Date(value).toLocaleString('ar-MA', {
+const formatDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('ar-MA', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+};
 
 export default function Archive() {
   const [tab, setTab] = useState('attendance');
@@ -17,22 +21,29 @@ export default function Archive() {
   const [archived, setArchived] = useState([]);
   const [activities] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [studentNames, setStudentNames] = useState({});
   const [errorMessage, setErrorMessage] = useState('');
   const { setStudents } = useStudents();
 
   useEffect(() => {
     let mounted = true;
     const loadArchive = async () => {
-      const [{ data: archivedStudents, error: studentsError }, { data: attendanceRows, error: attendanceError }, { data: teacherRows, error: teachersError }] = await Promise.all([
+      const [{ data: archivedStudents, error: studentsError }, { data: allStudents, error: allStudentsError }, { data: attendanceRows, error: attendanceError }, { data: teacherRows, error: teachersError }] = await Promise.all([
         supabase.from('students').select('*').eq('archived', true).order('id', { ascending: false }),
+        supabase.from('students').select('id, full_name'),
         supabase.from('attendance').select('*').order('date', { ascending: false }),
         supabase.from('teachers').select('id, full_name'),
       ]);
       if (studentsError) throw studentsError;
+      if (allStudentsError) throw allStudentsError;
       if (attendanceError) throw attendanceError;
       if (teachersError) throw teachersError;
       if (mounted) {
         setArchived(archivedStudents || []);
+        setStudentNames((allStudents || []).reduce((map, student) => {
+          map[student.id] = student.full_name || student.fullName || '';
+          return map;
+        }, {}));
         setAttendance(attendanceRows || []);
         setTeachers(teacherRows || []);
       }
@@ -60,17 +71,28 @@ export default function Archive() {
     return teacher?.full_name || teacher?.fullName || teacher?.name || 'غير محدد';
   };
 
+  const resolveStudentName = (record) => {
+    if (record.studentName || record.student_name) return record.studentName || record.student_name;
+    if (record.student_id && studentNames[record.student_id]) return studentNames[record.student_id];
+    return '—';
+  };
+
+  const resolveRecordDate = (record) => record.date || record.attendance_date || '—';
+
   const filteredAttendance = useMemo(
-    () => attendance.filter((record) => (!date || record.date === date) && (!month || record.date?.startsWith(month))),
+    () => attendance.filter((record) => {
+      const recordDate = resolveRecordDate(record);
+      return (!date || recordDate === date) && (!month || recordDate?.startsWith(month));
+    }),
     [attendance, date, month]
   );
 
   const exportAttendance = () => {
     const rows = filteredAttendance.map((item) => ({
-      التاريخ: item.date,
-      التلميذ: item.studentName,
+      التاريخ: resolveRecordDate(item),
+      التلميذ: resolveStudentName(item),
       الحالة: item.status,
-      الوقت: formatDate(item.timestamp),
+      الوقت: formatDate(item.created_at || item.createdAt),
     }));
     const blob = new Blob([JSON.stringify(rows, null, 2)], {
       type: 'application/json;charset=utf-8',
@@ -158,7 +180,7 @@ export default function Archive() {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[620px] text-right text-sm">
               <thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">التاريخ</th><th className="p-3">التلميذ</th><th className="p-3">الحالة</th><th className="p-3">وقت التسجيل</th></tr></thead>
-              <tbody>{filteredAttendance.map((item) => <tr key={item.id} className="border-b border-slate-100"><td className="p-3">{item.date}</td><td className="p-3 font-bold">{item.studentName}</td><td className="p-3">{item.status}</td><td className="p-3">{formatDate(item.timestamp)}</td></tr>)}</tbody>
+              <tbody>{filteredAttendance.map((item) => <tr key={item.id} className="border-b border-slate-100"><td className="p-3">{resolveRecordDate(item)}</td><td className="p-3 font-bold">{resolveStudentName(item)}</td><td className="p-3">{item.status}</td><td className="p-3">{formatDate(item.created_at || item.createdAt)}</td></tr>)}</tbody>
             </table>
             {!filteredAttendance.length && <p className="p-8 text-center font-bold text-slate-500">لا توجد سجلات محلية لهذا التاريخ.</p>}
           </div>

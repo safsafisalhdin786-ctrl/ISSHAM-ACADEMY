@@ -15,6 +15,35 @@ const SUBJECTS_LIST = [
   'الاجتماعيات',
   'مادة أخرى'
 ];
+const TEACHER_TYPES = [
+  { value: 'primary', label: 'التعليم الابتدائي' },
+  { value: 'middle', label: 'التعليم الإعدادي / الثانوي' },
+];
+const LEVELS_LIST = [
+  'الأول ابتدائي', 'الثاني ابتدائي', 'الثالث ابتدائي', 'الرابع ابتدائي',
+  'الخامس ابتدائي', 'السادس ابتدائي', 'الأولى إعدادي', 'الثانية إعدادي',
+  'الثالثة إعدادي', 'الجذع المشترك', 'الأولى باكالوريا', 'الثانية باكالوريا',
+];
+
+const decodeTeacherDetails = (teacher) => {
+  try {
+    const details = typeof teacher.subject === 'string' ? JSON.parse(teacher.subject) : teacher.subject;
+    if (details && typeof details === 'object' && Array.isArray(details.subjects)) {
+      return {
+        teacherType: details.teacherType || 'middle',
+        subjects: details.subjects,
+        levels: Array.isArray(details.levels) ? details.levels : [],
+      };
+    }
+  } catch {
+    // Legacy records store a single subject as plain text.
+  }
+  return {
+    teacherType: 'middle',
+    subjects: teacher.subject ? [teacher.subject] : [],
+    levels: Array.isArray(teacher.levels) ? teacher.levels : [],
+  };
+};
 
 export default function Teachers() {
   const [teachers, setTeachers] = useState([]);
@@ -22,6 +51,7 @@ export default function Teachers() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
 
@@ -31,7 +61,9 @@ export default function Teachers() {
 
   const [form, setForm] = useState({
     fullName: '',
-    subject: 'الرياضيات',
+    teacherType: 'middle',
+    subjects: ['الرياضيات'],
+    levels: [],
     phone: '',
     salary: ''
   });
@@ -44,6 +76,7 @@ export default function Teachers() {
       if (error) throw error;
       const teachersList = (data || []).map((teacher) => ({
         ...teacher,
+        ...decodeTeacherDetails(teacher),
         displayName: teacher.full_name || teacher.fullName || teacher.name || 'أستاذ غير مسمى',
       }));
       setTeachers(teachersList);
@@ -61,11 +94,28 @@ export default function Teachers() {
   // حفظ أو تعديل أستاذ
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.fullName.trim() || !form.phone.trim() || form.subjects.length === 0) {
+      setErrorMessage('المرجو إدخال الاسم والهاتف واختيار مادة واحدة على الأقل.');
+      return;
+    }
+    const duplicate = teachers.some((teacher) => (
+      teacher.id !== editingId
+      && teacher.phone?.replace(/\D/g, '') === form.phone.replace(/\D/g, '')
+    ));
+    if (duplicate) {
+      setErrorMessage('هذا الأستاذ مسجل مسبقاً بنفس رقم الهاتف.');
+      return;
+    }
     setSaving(true);
+    setErrorMessage('');
     try {
       const payload = {
         full_name: form.fullName.trim(),
-        subject: form.subject,
+        subject: JSON.stringify({
+          teacherType: form.teacherType,
+          subjects: form.subjects,
+          levels: form.levels,
+        }),
         phone: form.phone.trim(),
         salary: form.salary ? Number(form.salary) : 0,
         status: 'active',
@@ -80,11 +130,12 @@ export default function Teachers() {
         if (error) throw error;
       }
 
-      setForm({ fullName: '', subject: 'الرياضيات', phone: '', salary: '' });
+      setForm({ fullName: '', teacherType: 'middle', subjects: ['الرياضيات'], levels: [], phone: '', salary: '' });
       setShowAddForm(false);
       fetchData();
     } catch (error) {
       logger.error('Teachers.save', error);
+      setErrorMessage(`تعذر حفظ بيانات الأستاذ: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setSaving(false);
     }
@@ -94,7 +145,9 @@ export default function Teachers() {
   const handleEdit = (teacher) => {
     setForm({
       fullName: teacher.full_name || teacher.fullName || teacher.name || '',
-      subject: teacher.subject || 'الرياضيات',
+      teacherType: teacher.teacherType || 'middle',
+      subjects: teacher.subjects?.length ? teacher.subjects : ['الرياضيات'],
+      levels: teacher.levels || [],
       phone: teacher.phone || '',
       salary: teacher.salary || ''
     });
@@ -138,7 +191,7 @@ export default function Teachers() {
   const filteredTeachers = teachers.filter(t => {
     const matchesSearch = t.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           t.phone?.includes(searchTerm);
-    const matchesSubject = subjectFilter ? t.subject === subjectFilter : true;
+    const matchesSubject = subjectFilter ? (t.subjects || []).includes(subjectFilter) : true;
     return matchesSearch && matchesSubject;
   });
 
@@ -152,13 +205,18 @@ export default function Teachers() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">إضافة وتتبع الطاقم التربوي لأكاديمية إسهام</p>
         </div>
+        {errorMessage && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
+            {errorMessage}
+          </div>
+        )}
         
         {/* زر إضافة أستاذ جديد بارز */}
         <button 
           onClick={() => {
             setShowAddForm(!showAddForm);
             setEditingId(null);
-            setForm({ fullName: '', subject: 'الرياضيات', phone: '', salary: '' });
+            setForm({ fullName: '', teacherType: 'middle', subjects: ['الرياضيات'], levels: [], phone: '', salary: '' });
           }}
           className={`px-5 py-2.5 text-white rounded-lg transition font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer ${
             showAddForm 
@@ -201,16 +259,54 @@ export default function Teachers() {
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-bold mb-1">المادة المدرسة</label>
-              <select 
-                value={form.subject} 
-                onChange={e => setForm({ ...form, subject: e.target.value })} 
+              <label className="block text-slate-700 font-bold mb-1">نوع الأستاذ</label>
+              <select
+                value={form.teacherType}
+                onChange={e => setForm({ ...form, teacherType: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
               >
-                {SUBJECTS_LIST.map(sub => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
+                {TEACHER_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
               </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-700 font-bold mb-2">المواد التي يدرسها</label>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+                {SUBJECTS_LIST.map((subject) => (
+                  <label key={subject} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.subjects.includes(subject)}
+                      onChange={() => setForm((current) => ({
+                        ...current,
+                        subjects: current.subjects.includes(subject)
+                          ? current.subjects.filter((item) => item !== subject)
+                          : [...current.subjects, subject],
+                      }))}
+                    />
+                    {subject}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-700 font-bold mb-2">المستويات المسندة</label>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+                {LEVELS_LIST.map((level) => (
+                  <label key={level} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.levels.includes(level)}
+                      onChange={() => setForm((current) => ({
+                        ...current,
+                        levels: current.levels.includes(level)
+                          ? current.levels.filter((item) => item !== level)
+                          : [...current.levels, level],
+                      }))}
+                    />
+                    {level}
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
               <label className="block text-slate-700 font-bold mb-1">رقم الهاتف *</label>
@@ -315,7 +411,7 @@ export default function Teachers() {
                     <td className="p-4 font-bold text-slate-900">{teacher.displayName}</td>
                     <td className="p-4">
                       <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-md text-xs font-semibold border border-amber-200">
-                        {teacher.subject || 'غير محدد'}
+                        {teacher.subjects?.length ? teacher.subjects.join('، ') : 'غير محدد'}
                       </span>
                     </td>
                     <td className="p-4 font-mono text-xs" dir="ltr">
