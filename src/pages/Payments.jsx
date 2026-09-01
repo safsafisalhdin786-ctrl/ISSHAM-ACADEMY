@@ -136,33 +136,30 @@ export default function Payments() {
       }
   };
 
-  // إرسال وصل الاستلام عبر الواتساب عند تسديد الواجب
-  const sendWhatsAppReceipt = (receipt) => {
-    if (!receipt.parentPhone) return alert('رقم هاتف الولي غير متوفر لهذا التلميذ');
-    
-    const formattedPhone = receipt.parentPhone.startsWith('0') 
-      ? '212' + receipt.parentPhone.slice(1) 
-      : receipt.parentPhone;
+ // إرسال وصل الاستلام عبر الواتساب عند تسديد الواجب
+ const sendWhatsAppReceipt = (receipt) => {
+   if (!receipt.parentPhone) return alert('رقم هاتف الولي غير متوفر لهذا التلميذ');
 
-    const message = `✨ *إشعار تسديد الواجب الشهري - ISSHAAM ACADEMY* ✨
+   const rawPhone = String(receipt.parentPhone).trim();
+   const formattedPhone = rawPhone.startsWith('+')
+     ? rawPhone.slice(1)
+     : rawPhone.startsWith('0')
+       ? `212${rawPhone.slice(1)}`
+       : rawPhone.replace(/\s+/g, '').replace(/-/g, '');
 
-السلام عليكم ورحمة الله وبركاته،
-ولي أمر التلميذ(ة): *${receipt.studentName}* (${receipt.level})
+   const message = `السلام عليكم ورحمة الله وبركاته،\n\n` +
+     `تخبركم إدارة *أكاديمية إسهام* 🏫 بأن الواجب الشهري الخاص بالتلميذ *${receipt.studentName || 'التلميذ'}* قد تم استلامه بنجاح.\n\n` +
+     `📄 رقم الوصل: *${receipt.receiptNo || '---'}*\n` +
+     `📚 المستوى: *${receipt.level || 'غير محدد'}*\n` +
+     `📅 الشهر: *${receipt.month || 'غير محدد'}*\n` +
+     `💰 المبلغ: *${receipt.amount || 0} درهم*\n` +
+     `🗓️ تاريخ الأداء: *${receipt.date || new Date().toLocaleDateString('ar-MA')}*\n\n` +
+     `الحالة: ✅ *مدفوع / PAYÉ*\n\n` +
+     `شكرًا لتعاونكم، ونتمنى للطالب التوفيق والنجاح. 🌟`;
 
-نشكركم على ثقتكم الغالية فـ *ISSHAAM ACADEMY*. نود إخباركم أنه قد تم استلام الواجب الشهري بنجاح:
-📄 *رقم الوصل:* ${receipt.receiptNo}
-📅 *عن شهر:* ${receipt.month}
-💰 *المبلغ الاستلام:* ${receipt.amount} درهم
-🗓️ *تاريخ الأداء:* ${receipt.date}
-
-الحالة: ✅ *مكاشي - PAYÉ*
-
-نسأل الله بالتوفيق والنجاح لأبنائنا الكرام! 🎓
-_إدارة أكاديمية عصام للدعم والتميز_`;
-
-    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
+   const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+   window.open(url, '_blank');
+ };
 
   // إرسال تذكير بالدفع للتلاميذ الذين لم يؤدوا بعد
   const sendWhatsAppReminder = (student) => {
@@ -337,7 +334,16 @@ _إدارة أكاديمية عصام للدعم والتميز_`;
             </table>
           </div>
         ) : (
-          <p className="text-center font-bold text-slate-500 py-4">لا توجد أداءات مسجلة بعد</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-slate-500">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-500 shadow-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-7 w-7">
+                <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"/>
+                <path d="M8 9h8M8 12h8M8 15h5"/>
+              </svg>
+            </div>
+            <p className="text-lg font-black text-slate-700">لا توجد أداءات مسجلة بعد.</p>
+            <p className="text-sm font-semibold text-slate-500">ابدأ بتسجيل أول دفعة شهرية من التلاميذ.</p>
+          </div>
         )}
       </div>
 

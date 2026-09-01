@@ -38,6 +38,8 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [newComment, setNewComment] = useState('');
   const [pendingArchive, setPendingArchive] = useState(null);
+  const [levelFilter, setLevelFilter] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -341,6 +343,20 @@ export default function Students() {
     window.open(`https://wa.me/${clean}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const filteredStudents = students.filter((student) => {
+    const levelName = getLevelName(student).toLowerCase();
+    const matchesLevel = levelFilter ? levelName.includes(levelFilter.toLowerCase()) : true;
+    const matchesSearch = !searchKeyword || [
+      student.full_name,
+      student.parent_phone,
+      student.parent_whatsapp,
+      getTeacherForStudent(student),
+      getLevelName(student),
+    ].some((value) => String(value || '').toLowerCase().includes(searchKeyword.toLowerCase()));
+
+    return matchesLevel && matchesSearch;
+  });
+
   if (loading) {
     return (
       <div className="p-8 text-center text-slate-700 font-bold dir-rtl">
@@ -376,14 +392,52 @@ export default function Students() {
         </div>
       )}
 
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-1">
+            <label className="mb-1 block text-xs font-black uppercase tracking-[0.2em] text-slate-500">بحث سريع</label>
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="ابحث باسم التلميذ، الهاتف أو الأستاذ..."
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+            />
+          </div>
+
+          <div className="lg:w-72">
+            <label className="mb-1 block text-xs font-black uppercase tracking-[0.2em] text-slate-500">فلتر المستوى</label>
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+            >
+              <option value="">كل المستويات</option>
+              {levels.map((level) => (
+                <option key={level.id} value={level.name_ar || level.id}>{level.name_ar || level.id}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* STUDENTS LIST */}
-      {students.length === 0 ? (
-        <div className="bg-white rounded-xl border p-8 text-center font-bold text-slate-600">
-          لا يوجد تلاميذ حالياً.
+      {filteredStudents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-600 shadow-inner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-7 w-7">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="10" cy="7" r="4"/>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <p className="text-xl font-black text-slate-800">لا توجد بيانات مطابقة للبحث الحالي.</p>
+          <p className="text-sm font-semibold text-slate-500">جرّب تغيير فلتر المستوى أو ابحث باسم تلميذ آخر.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {students.map((student) => {
+          {filteredStudents.map((student) => {
             return (
               <div
                 key={student.id}

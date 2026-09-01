@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Clock3, UserCheck, UserX, UserRoundCog, Users } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 import { useStudents } from '../context/StudentsContext';
@@ -585,6 +586,14 @@ export default function Attendance() {
         'excused'
     ).length;
 
+  const liveStats = useMemo(() => ({
+    present: presentCount,
+    absent: absentCount,
+    late: lateCount,
+    excused: excusedCount,
+    total: filteredStudents.length,
+  }), [filteredStudents.length, presentCount, absentCount, lateCount, excusedCount]);
+
   // =====================================================
   // LOADING
   // =====================================================
@@ -658,6 +667,27 @@ export default function Attendance() {
           ❌ {errorMessage}
         </div>
       )}
+
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          { label: 'الحاضرون', value: liveStats.present, tone: 'emerald', icon: UserCheck },
+          { label: 'الغائبون', value: liveStats.absent, tone: 'rose', icon: UserX },
+          { label: 'المتأخرون', value: liveStats.late, tone: 'sky', icon: Clock3 },
+          { label: 'المبررون', value: liveStats.excused, tone: 'amber', icon: UserRoundCog },
+        ].map(({ label, value, tone, icon: Icon }) => (
+          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-500">{label}</p>
+                <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
+              </div>
+              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${tone === 'emerald' ? 'bg-emerald-100 text-emerald-700' : tone === 'rose' ? 'bg-rose-100 text-rose-700' : tone === 'sky' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+                <Icon size={20} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div className="bg-white p-4 rounded-xl shadow-md border border-slate-300 flex flex-col md:flex-row justify-between items-center gap-4">
 
@@ -797,8 +827,12 @@ export default function Attendance() {
 
         {filteredStudents.length === 0 ? (
 
-          <div className="p-6 text-center text-slate-500 font-bold">
-            لا يوجد تلاميذ مطابقون للفلترة الحالية.
+          <div className="flex flex-col items-center justify-center gap-3 p-10 text-center text-slate-500">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-500 shadow-inner">
+              <Users size={28} />
+            </div>
+            <p className="text-lg font-black text-slate-700">لا يوجد تلاميذ مطابقون للفلترة الحالية.</p>
+            <p className="text-sm font-semibold text-slate-500">غيّر معايير البحث أو المستوى لعرض النتائج.</p>
           </div>
 
         ) : (
