@@ -71,19 +71,26 @@ export default function Teachers() {
   });
 
   // جلب البيانات من قاعدة الأكاديمية المركزية
-  const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('teachers').select('*').order('full_name', { ascending: true });
+      setErrorMessage('');
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .order('full_name', { ascending: true });
       if (error) throw error;
-      const teachersList = (data || []).map((teacher) => ({
-        ...teacher,
-        ...decodeTeacherDetails(teacher),
-        displayName: teacher.full_name || teacher.fullName || teacher.name || 'أستاذ غير مسمى',
-      }));
+      const teachersList = (data || [])
+        .filter((teacher) => teacher.status !== 'inactive')
+        .map((teacher) => ({
+          ...teacher,
+          ...decodeTeacherDetails(teacher),
+          displayName: teacher.full_name || teacher.fullName || teacher.name || 'أستاذ غير مسمى',
+        }));
       setTeachers(teachersList);
     } catch (error) {
       logger.error('Teachers.fetchData', error);
+      setErrorMessage(`تعذر تحميل قائمة الأساتذة: ${describeSupabaseError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -174,18 +181,20 @@ export default function Teachers() {
   };
 
   // تنفيذ الحذف النهائي
-  const executeDelete = async () => {
+    const executeDelete = async () => {
     if (!deleteModal.id) return;
     setDeleting(true);
     try {
       const { error } = await supabase.from('teachers').update({
         status: 'inactive',
+        user_id: currentUser?.uid || null,
       }).eq('id', deleteModal.id);
       if (error) throw error;
       setDeleteModal({ show: false, id: null, name: '' });
       fetchData();
     } catch (error) {
       logger.error('Teachers.delete', error);
+      setErrorMessage(`تعذر حذف الأستاذ: ${describeSupabaseError(error)}`);
     } finally {
       setDeleting(false);
     }

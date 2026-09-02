@@ -39,6 +39,33 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, resetPassword } = useAuth();
 
+  const getLoginErrorMessage = (loginError) => {
+    const authCode = loginError?.code || loginError?.name || '';
+    const authMessage = loginError?.message || '';
+
+    if (authCode === 'user-not-found') return 'البريد الإلكتروني غير مسجل في النظام';
+    if (authCode === 'invalid_credentials' || authCode === 'invalid-login-credentials' || authCode === 'auth/invalid-credential' || authCode === 'auth/wrong-password' || authMessage.toLowerCase().includes('invalid login credentials')) {
+      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+    }
+    if (authCode === 'user-disabled' || authCode === 'auth/user-disabled') {
+      return 'الحساب معطل، تواصل مع الإدارة';
+    }
+    if (authMessage.includes('ACCOUNT_TYPE_MISMATCH') || authMessage.includes('NO_ROLE_FOR_ACCOUNT')) {
+      return 'هذا الحساب مسجل في Supabase لكنه لا يطابق نوع المستخدم المحدد أو لا توجد له صلاحية في النظام.';
+    }
+    if (authMessage.toLowerCase().includes('failed to fetch') || authMessage.toLowerCase().includes('network') || authMessage.toLowerCase().includes('fetch')) {
+      return 'تعذر الاتصال بخادم Supabase. تحقق من اتصال الإنترنت أو إعدادات المشروع.';
+    }
+    if (authMessage.toLowerCase().includes('row-level security') || authMessage.toLowerCase().includes('rls')) {
+      return 'تم رفض الوصول من قبل سياسة الأمان (RLS) في قاعدة البيانات.';
+    }
+    if (authMessage.toLowerCase().includes('missing') || authMessage.toLowerCase().includes('not configured') || authMessage.toLowerCase().includes('supabase')) {
+      return 'إعدادات Supabase غير مكتملة أو غير صحيحة في هذه البيئة.';
+    }
+    if (authMessage) return `حدث خطأ تقني أثناء تسجيل الدخول: ${authMessage}`;
+    return 'حدث خطأ تقني أثناء تسجيل الدخول، يرجى المحاولة مرة أخرى.';
+  };
+
   useEffect(() => {
     const updateCountdown = () => {
       const remaining = Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
@@ -78,13 +105,15 @@ export default function Login() {
       if (rememberMe) {
         window.localStorage.setItem('isshaam_remembered_email', cleanEmail);
       }
-      await login(cleanEmail, password);
+      const expectedRole = userType === 'teacher' ? 'teacher' : userType === 'student' ? 'student' : 'admin';
+      await login(cleanEmail, password, expectedRole);
       window.sessionStorage.removeItem('isshaam_login_attempts');
       window.sessionStorage.removeItem('isshaam_login_blocked_until');
       setFailedAttempts(0);
       setBlockedUntil(0);
       navigate('/dashboard', { replace: true });
     } catch (loginError) {
+      console.error('Login failed:', loginError);
       const nextAttempts = failedAttempts + 1;
       setFailedAttempts(nextAttempts);
       window.sessionStorage.setItem('isshaam_login_attempts', String(nextAttempts));
@@ -94,17 +123,7 @@ export default function Login() {
         window.sessionStorage.setItem('isshaam_login_blocked_until', String(until));
         setError('تم حظر المحاولات لمدة 15 دقيقة');
       } else {
-        setError(
-        loginError?.code === 'auth/user-disabled'
-          ? 'الحساب معطل، تواصل مع الإدارة'
-          : loginError?.code === 'auth/user-not-found'
-            ? 'البريد الإلكتروني غير مسجل في النظام'
-            : loginError?.code === 'auth/invalid-credential' ||
-          loginError?.code === 'auth/user-not-found' ||
-          loginError?.code === 'auth/wrong-password'
-          ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
-          : 'حدث خطأ تقني أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.'
-        );
+        setError(getLoginErrorMessage(loginError));
       }
       setLoading(false);
     }

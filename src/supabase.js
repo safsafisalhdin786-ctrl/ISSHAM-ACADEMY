@@ -1,36 +1,67 @@
 import { createClient } from '@supabase/supabase-js';
 import logger from './utils/logger';
 
-const configuredUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const configuredKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-export const hasValidConfig =
-  /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(configuredUrl) &&
-  configuredKey.length > 20 &&
-  !configuredKey.includes('xxxx');
+const configuredUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const configuredKey = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  ''
+).trim();
 
-// Non-sensitive message: never logs the actual URL or key values.
+const isValidSupabaseUrl = (value = '') => {
+  const safeValue = value.trim();
+  if (!safeValue) return false;
+
+  return (
+    /^https:\/\/[a-z0-9-]+\.supabase\.co(?:\/.+)?$/i.test(safeValue)
+    || /^http:\/\/localhost:\d+(?:\/.+)?$/i.test(safeValue)
+    || /^https?:\/\/127\.0\.0\.1:\d+(?:\/.+)?$/i.test(safeValue)
+  );
+};
+
+const isLikelyValidAnonKey = (value = '') => value.length >= 20 && !value.includes('xxxx');
+
+export const hasValidConfig = isValidSupabaseUrl(configuredUrl) && isLikelyValidAnonKey(configuredKey);
+
 export const SUPABASE_CONFIG_ERROR_MESSAGE =
-  'إعدادات Supabase غير مكتملة في هذه البيئة. يرجى ضبط المتغيرين VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY في إعدادات النشر (Vercel) أو في ملف .env.local للتطوير المحلي.';
+  'إعدادات Supabase غير مكتملة في هذه البيئة. يرجى ضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY (أو VITE_SUPABASE_PUBLISHABLE_KEY) في إعدادات النشر (Vercel) أو في ملف .env.local للتطوير المحلي.';
+
+const INVALID_SUPABASE_URL = 'https://invalid.supabase.co';
+const INVALID_SUPABASE_ANON_KEY = 'invalid-anon-key';
 
 if (!hasValidConfig) {
-  // Always surface this warning (even in production) since it contains no secrets
-  // and is critical to diagnosing "Failed to fetch" style errors caused by a
-  // missing/placeholder Supabase configuration for the current environment.
   console.error(`[Supabase] ${SUPABASE_CONFIG_ERROR_MESSAGE}`);
   logger.warn('Supabase', SUPABASE_CONFIG_ERROR_MESSAGE);
 }
 
 export const supabase = createClient(
-  hasValidConfig ? configuredUrl : 'https://placeholder.supabase.co',
-  hasValidConfig ? configuredKey : 'placeholder-anon-key'
+  hasValidConfig ? configuredUrl : INVALID_SUPABASE_URL,
+  hasValidConfig ? configuredKey : INVALID_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );
 
-// Wraps a Supabase query error so pages show the real diagnostic reason
-// (e.g. missing environment configuration) instead of a generic
-// "TypeError: Failed to fetch" when the client was never configured.
 export const describeSupabaseError = (error) => {
   if (!hasValidConfig) {
     return SUPABASE_CONFIG_ERROR_MESSAGE;
   }
-  return error?.message || 'خطأ غير معروف';
+
+  if (error?.code === 'PGRST301' || error?.message?.includes('JWT')) {
+    return 'جلسة Supabase غير صالحة أو منتهية. يرجى تسجيل الدخول مرة أخرى.';
+  }
+
+  if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+    return 'تم رفض العملية من قبل سياسة الأمان (RLS) في قاعدة البيانات. تحقق من صلاحيات المستخدم وتسجيل الدخول والحقول المطلوبة مثل user_id.';
+  }
+
+  if (error?.message) {
+    return error.message;
+  }
+
+  return 'خطأ غير معروف في قاعدة البيانات.';
 };

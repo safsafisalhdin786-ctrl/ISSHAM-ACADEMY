@@ -1,10 +1,12 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
 import { useStudents } from '../context/StudentsContext';
+import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import logger from '../utils/logger';
 
 export default function Payments() {
+  const { currentUser } = useAuth();
   const { students, setStudents } = useStudents();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,7 @@ export default function Payments() {
         notes: receiptData.notes,
         date: new Date().toISOString(),
         status: 'paid',
+        user_id: currentUser?.uid || null,
       }).select().single();
       if (error) throw error;
       setPayments((current) => [{ ...receiptData, ...data, id: data.id }, ...current]);

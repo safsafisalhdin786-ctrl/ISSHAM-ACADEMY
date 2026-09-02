@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
 import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
 import { useStudents } from '../context/StudentsContext';
+import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
 
 export default function Financials() {
+  const { currentUser } = useAuth();
   const { students } = useStudents();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,7 @@ export default function Financials() {
         month: selectedMonth,
         status: 'paid',
         paid_at: new Date().toISOString(),
+        user_id: currentUser?.uid || null,
       };
       const { error } = await supabase.from('payments').insert(newPayment);
       if (error) throw error;

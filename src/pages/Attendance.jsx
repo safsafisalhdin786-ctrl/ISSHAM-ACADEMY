@@ -429,7 +429,10 @@ export default function Attendance() {
               error: insertError,
             } = await supabase
               .from('attendance')
-              .insert(record);
+              .insert({
+                ...record,
+                user_id: currentUser?.uid || null,
+              });
 
             if (insertError) {
               throw insertError;
