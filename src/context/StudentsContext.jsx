@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import logger from '../utils/logger';
 
 export const normalizeStudent = (student) => ({
@@ -42,7 +42,7 @@ export function StudentsProvider({ children }) {
         .eq('archived', false)
         .order('full_name', { ascending: true });
       if (error) {
-        logger.error('StudentsContext', error);
+        logger.error('StudentsContext', new Error(describeSupabaseError(error)));
         if (active) setStudentsLoading(false);
         return;
       }

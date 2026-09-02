@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import { useStudents } from '../context/StudentsContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import logger from '../utils/logger';
@@ -79,6 +79,11 @@ export default function Payments() {
     e.preventDefault();
     if (!selectedStudentId || !amountPaid) return alert('المرجو اختيار التلميذ والمبلغ');
 
+    const numericAmount = Number(amountPaid);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > 1000000) {
+      return alert('المرجو إدخال مبلغ صحيح وموجب.');
+    }
+
     const student = students.find(s => s.id === selectedStudentId);
     if (!student) return;
     const receiptData = {
@@ -88,7 +93,7 @@ export default function Payments() {
       studentName: student.fullName,
       parentPhone: student.parentPhone || '',
       level: student.level,
-      amount: amountPaid,
+      amount: numericAmount,
       month: month,
       notes: notes,
       date: new Date().toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -121,7 +126,7 @@ export default function Payments() {
     } catch (error) {
       logger.error('Payments.register', error);
       setPrintedReceipt(null);
-      alert(`تعذر حفظ الأداء في قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
+      alert(`تعذر حفظ الأداء في قاعدة البيانات: ${describeSupabaseError(error)}`);
     }
   };
 
@@ -159,7 +164,7 @@ export default function Payments() {
      `شكرًا لتعاونكم، ونتمنى للطالب التوفيق والنجاح. 🌟`;
 
    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-   window.open(url, '_blank');
+   window.open(url, '_blank', 'noopener,noreferrer');
  };
 
   // إرسال تذكير بالدفع للتلاميذ الذين لم يؤدوا بعد
@@ -185,7 +190,7 @@ export default function Payments() {
 لأي استفسار يرجى التواصل مع الإدارة.`;
 
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (

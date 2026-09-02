@@ -27,42 +27,6 @@ const ALLOWED_ROLES = {
   TEACHER: 'teacher',
   STUDENT: 'student',
 };
-const DEMO_EMAIL = 'admin@isshaam.com';
-const DEMO_USER = {
-  uid: 'demo-admin',
-  email: DEMO_EMAIL,
-  displayName: 'Demo Administrator',
-  isDemo: true,
-};
-
-const isDemoAuthenticated = () => {
-  if (typeof window === 'undefined') return false;
-
-  const expiresAt = Number(window.localStorage.getItem('isshaam_auth_expires_at') || 0);
-  if (expiresAt && expiresAt <= Date.now()) {
-    window.localStorage.removeItem('isshaam_demo_auth');
-    window.localStorage.removeItem('issham_auth');
-    window.localStorage.removeItem('isshaam_auth_expires_at');
-    return false;
-  }
-
-  if (window.localStorage.getItem('isshaam_demo_auth') === 'true') {
-    return true;
-  }
-
-  if (window.localStorage.getItem('issham_auth') === 'true') {
-    return true;
-  }
-
-  try {
-    const storedUser = JSON.parse(
-      window.localStorage.getItem('user') || 'null'
-    );
-    return storedUser?.email?.trim().toLowerCase() === DEMO_EMAIL;
-  } catch {
-    return false;
-  }
-};
 
 const withTimeout = (promise, timeout = 12000) => Promise.race([
   promise,
@@ -72,12 +36,11 @@ const withTimeout = (promise, timeout = 12000) => Promise.race([
 ]);
 
 export const AuthProvider = ({ children }) => {
-  const demoSession = isDemoAuthenticated();
-  const [currentUser, setCurrentUser] = useState(demoSession ? DEMO_USER : null);
-  const [userRole, setUserRole] = useState(demoSession ? ALLOWED_ROLES.ADMIN : null);
-  const [userData, setUserData] = useState(demoSession ? DEMO_USER : null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [userData, setUserData] = useState(null);
 
-  const [loading, setLoading] = useState(!demoSession);
+  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
@@ -94,15 +57,7 @@ export const AuthProvider = ({ children }) => {
         // NO USER
         // ==========================================
 
-        if (!user || isDemoAuthenticated()) {
-          if (isDemoAuthenticated()) {
-            setCurrentUser(DEMO_USER);
-            setUserRole(ALLOWED_ROLES.ADMIN);
-            setUserData(DEMO_USER);
-            setLoading(false);
-            return;
-          }
-
+        if (!user) {
           if (mounted) {
             setCurrentUser(null);
             setUserRole(null);
@@ -276,22 +231,6 @@ export const AuthProvider = ({ children }) => {
       );
     }
 
-    if (normalizedEmail === DEMO_EMAIL) {
-      window.localStorage.setItem(
-        'user',
-        JSON.stringify({ authenticated: true, user: DEMO_EMAIL, email: DEMO_EMAIL })
-      );
-      window.localStorage.setItem('isshaam_demo_auth', 'true');
-      window.localStorage.setItem('isshaam_auth_expires_at', String(Date.now() + 7 * 24 * 60 * 60 * 1000));
-      window.localStorage.setItem('issham_auth', 'true');
-      setCurrentUser(DEMO_USER);
-      setUserRole(ALLOWED_ROLES.ADMIN);
-      setUserData(DEMO_USER);
-      setAuthError(null);
-      setLoading(false);
-      return DEMO_USER;
-    }
-
     if (!password) {
       throw new Error(
         'المرجو إدخال كلمة السر.'
@@ -304,7 +243,6 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     const normalizedEmail = email?.trim().toLowerCase();
     if (!normalizedEmail) throw new Error('المرجو إدخال البريد الإلكتروني.');
-    if (normalizedEmail === DEMO_EMAIL) return;
     await withTimeout(sendPasswordResetEmail(auth, normalizedEmail));
   };
 
@@ -323,10 +261,6 @@ export const AuthProvider = ({ children }) => {
 
       throw error;
     } finally {
-      window.localStorage.removeItem('isshaam_demo_auth');
-      window.localStorage.removeItem('issham_auth');
-      window.localStorage.removeItem('isshaam_auth_expires_at');
-      window.localStorage.removeItem('user');
       setCurrentUser(null);
       setUserRole(null);
       setUserData(null);

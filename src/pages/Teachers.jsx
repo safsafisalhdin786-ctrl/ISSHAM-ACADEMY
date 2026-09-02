@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import logger from '../utils/logger';
@@ -98,6 +98,16 @@ export default function Teachers() {
       setErrorMessage('المرجو إدخال الاسم والهاتف واختيار مادة واحدة على الأقل.');
       return;
     }
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    if (phoneDigits.length < 9 || phoneDigits.length > 15) {
+      setErrorMessage('رقم الهاتف غير صحيح.');
+      return;
+    }
+    const salaryValue = form.salary ? Number(form.salary) : 0;
+    if (!Number.isFinite(salaryValue) || salaryValue < 0 || salaryValue > 1000000) {
+      setErrorMessage('المرجو إدخال أجرة صحيحة وغير سالبة.');
+      return;
+    }
     const duplicate = teachers.some((teacher) => (
       teacher.id !== editingId
       && teacher.phone?.replace(/\D/g, '') === form.phone.replace(/\D/g, '')
@@ -117,7 +127,7 @@ export default function Teachers() {
           levels: form.levels,
         }),
         phone: form.phone.trim(),
-        salary: form.salary ? Number(form.salary) : 0,
+        salary: salaryValue,
         status: 'active',
       };
 
@@ -135,7 +145,7 @@ export default function Teachers() {
       fetchData();
     } catch (error) {
       logger.error('Teachers.save', error);
-      setErrorMessage(`تعذر حفظ بيانات الأستاذ: ${error.message || 'خطأ غير معروف'}`);
+      setErrorMessage(`تعذر حفظ بيانات الأستاذ: ${describeSupabaseError(error)}`);
     } finally {
       setSaving(false);
     }
@@ -184,7 +194,9 @@ export default function Teachers() {
     let clean = phone.trim().replace(/\s+/g, '').replace(/-/g, '');
     if (clean.startsWith('0')) clean = '212' + clean.substring(1);
     if (clean.startsWith('+')) clean = clean.substring(1);
-    window.open(`https://wa.me/${clean}`, '_blank');
+    // Only allow a plausible numeric phone number to prevent malformed/malicious URLs.
+    if (!/^\d{9,15}$/.test(clean)) return alert('رقم الهاتف غير صالح!');
+    window.open(`https://wa.me/${clean}`, '_blank', 'noopener,noreferrer');
   };
 
   // تصفية الأساتذة حسب البحث والمادة

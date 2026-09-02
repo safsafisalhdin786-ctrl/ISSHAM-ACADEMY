@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Clock3, UserCheck, UserX, UserRoundCog, Users } from 'lucide-react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import { useAuth } from '../context/AuthContext';
 import { useStudents } from '../context/StudentsContext';
 import logger from '../utils/logger';
@@ -220,7 +220,7 @@ export default function Attendance() {
     } catch (error) {
       logger.error('Attendance', error);
 
-      setErrorMessage(`تعذر تحميل بيانات الحضور المركزية: ${error.message || 'خطأ غير معروف'}`);
+      setErrorMessage(`تعذر تحميل بيانات الحضور المركزية: ${describeSupabaseError(error)}`);
 
     } finally {
       setLoading(false);
@@ -510,7 +510,8 @@ export default function Attendance() {
         `https://wa.me/${clean}?text=${encodeURIComponent(
           msg
         )}`,
-        '_blank'
+        '_blank',
+        'noopener,noreferrer'
       );
     };
 

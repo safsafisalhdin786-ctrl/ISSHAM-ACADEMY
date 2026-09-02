@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import { useStudents } from '../context/StudentsContext';
@@ -103,7 +103,7 @@ export default function Students() {
       const notices = [];
       if (teachersResult.error) {
         setTeachers([]);
-        notices.push(`تعذر تحميل قائمة الأساتذة: ${teachersResult.error.message || 'خطأ غير معروف'}`);
+        notices.push(`تعذر تحميل قائمة الأساتذة: ${describeSupabaseError(teachersResult.error)}`);
       } else {
         setTeachers((teachersResult.data || [])
           .filter((teacher) => teacher.status !== 'inactive')
@@ -111,7 +111,7 @@ export default function Students() {
       }
       if (levelsResult.error && levelsResult.error.code !== 'PGRST116') {
         setLevels(LEVEL_OPTIONS);
-        notices.push(`تعذر تحميل المستويات: ${levelsResult.error.message || 'خطأ غير معروف'}`);
+        notices.push(`تعذر تحميل المستويات: ${describeSupabaseError(levelsResult.error)}`);
       } else {
         setLevels(levelsResult.data?.length ? levelsResult.data : LEVEL_OPTIONS);
       }
@@ -119,7 +119,7 @@ export default function Students() {
     } catch (error) {
       logger.error('Students.fetchData', error);
       setTeachers([]);
-      setErrorMessage(`تعذر تحميل بيانات التلاميذ من قاعدة البيانات: ${error.message || 'خطأ غير معروف'}`);
+      setErrorMessage(`تعذر تحميل بيانات التلاميذ من قاعدة البيانات: ${describeSupabaseError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -410,7 +410,7 @@ export default function Students() {
       `بخصوص التلميذ(ة) *${student.full_name}*.\n\n` +
       `شكراً لتعاونكم. 🌹`;
 
-    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
 
   const filteredStudents = students.filter((student) => {

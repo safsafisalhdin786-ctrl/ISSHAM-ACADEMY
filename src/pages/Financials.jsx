@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase, describeSupabaseError } from '../supabase';
 import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
 import { useStudents } from '../context/StudentsContext';
 import logger from '../utils/logger';
@@ -32,7 +32,7 @@ export default function Financials() {
         paidAt: payment.paid_at || payment.paidAt,
       })));
     } catch (err) {
-      logger.error('Financials.fetchData', err);
+      logger.error('Financials.fetchData', new Error(describeSupabaseError(err)));
       setPayments([]);
     } finally {
       setLoading(false);
@@ -73,14 +73,19 @@ export default function Financials() {
     }
   };
 
+  const escapeHtml = (value) =>
+    String(value ?? '').replace(/[&<>"']/g, (char) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]
+    ));
+
   const handlePrintReceipt = (student, payment) => {
     const printWindow = window.open('', '_blank', 'width=600,height=700');
     if (!printWindow) return;
 
-    const studentName = student.fullName || 'غير محدد';
-    const level = student.level || 'غير محدد';
-    const amount = payment?.amount || student.monthlyFee || 0;
-    const paidDate = formatDate(payment?.paidAt);
+    const studentName = escapeHtml(student.fullName || 'غير محدد');
+    const level = escapeHtml(student.level || 'غير محدد');
+    const amount = escapeHtml(payment?.amount || student.monthlyFee || 0);
+    const paidDate = escapeHtml(formatDate(payment?.paidAt));
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -104,7 +109,7 @@ export default function Financials() {
           </div>
           <div class="row"><span>التلميذ:</span><strong>${studentName}</strong></div>
           <div class="row"><span>المستوى:</span><strong>${level}</strong></div>
-          <div class="row"><span>الشهر:</span><strong>${selectedMonth}</strong></div>
+          <div class="row"><span>الشهر:</span><strong>${escapeHtml(selectedMonth)}</strong></div>
           <div class="row total"><span>المبلغ:</span><span>${amount} DH</span></div>
           <hr />
           <p style="font-size:12px; color:#666;">تاريخ الأداء: ${paidDate}</p>

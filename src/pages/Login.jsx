@@ -14,7 +14,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const logoUrl = `${import.meta.env.BASE_URL}logo.jpeg`;
-const DEMO_EMAIL = 'admin@isshaam.com';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -73,30 +72,6 @@ export default function Login() {
     }
 
     setLoading(true);
-
-    // Demo access is deliberately local so an unconfigured live host never freezes.
-    if (cleanEmail === DEMO_EMAIL) {
-      window.localStorage.setItem(
-        'user',
-        JSON.stringify({ authenticated: true, user: DEMO_EMAIL, email: DEMO_EMAIL })
-      );
-      window.localStorage.setItem('issham_auth', 'true');
-      window.localStorage.setItem('isshaam_demo_auth', 'true');
-      window.sessionStorage.removeItem('isshaam_login_attempts');
-      window.sessionStorage.removeItem('isshaam_login_blocked_until');
-      setFailedAttempts(0);
-      setBlockedUntil(0);
-      window.localStorage.setItem('isshaam_remember', String(rememberMe));
-      if (rememberMe) {
-        window.localStorage.setItem('isshaam_remembered_email', cleanEmail);
-      } else {
-        window.localStorage.removeItem('isshaam_remembered_email');
-      }
-      void login(cleanEmail, password);
-      setLoading(false);
-      navigate('/dashboard', { replace: true });
-      return;
-    }
 
     try {
       window.localStorage.setItem('isshaam_remember', String(rememberMe));
