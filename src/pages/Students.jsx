@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
+import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import { useStudents } from '../context/StudentsContext';
@@ -38,6 +39,7 @@ const normalizeTeacher = (teacher) => {
 };
 
 export default function Students() {
+  const { currentUser } = useAuth();
   const { students, setStudents } = useStudents();
   const [teachers, setTeachers] = useState([]);
   const [levels, setLevels] = useState([]);
@@ -281,6 +283,7 @@ export default function Students() {
         monthly_fee: payload.monthly_fee,
         status: payload.status,
         archived: false,
+        user_id: currentUser?.uid || null,
       };
       const result = editingStudentId
         ? await supabase.from('students').update(studentFields).eq('id', editingStudentId).select('*').single()

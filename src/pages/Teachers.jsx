@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
+import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { maskPhone } from '../utils/security';
 import logger from '../utils/logger';
@@ -46,6 +47,7 @@ const decodeTeacherDetails = (teacher) => {
 };
 
 export default function Teachers() {
+  const { currentUser } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -129,6 +131,7 @@ export default function Teachers() {
         phone: form.phone.trim(),
         salary: salaryValue,
         status: 'active',
+        user_id: currentUser?.uid || null,
       };
 
       if (editingId) {
