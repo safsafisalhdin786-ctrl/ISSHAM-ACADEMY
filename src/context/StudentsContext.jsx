@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
+import { useAuth } from './AuthContext';
 import logger from '../utils/logger';
 
 export const normalizeStudent = (student) => ({
@@ -22,6 +23,7 @@ export const normalizeStudent = (student) => ({
 const StudentsContext = createContext(null);
 
 export function StudentsProvider({ children }) {
+  const { currentUser, loading: authLoading } = useAuth();
   const [students, setStudentsState] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -34,8 +36,18 @@ export function StudentsProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Wait until the authenticated Supabase session is restored before querying,
+    // otherwise RLS rejects the SELECT and students stay empty.
+    if (authLoading) return;
+    if (!currentUser) {
+      setStudentsState([]);
+      setStudentsLoading(false);
+      return;
+    }
+
     let active = true;
     const loadStudents = async () => {
+      setStudentsLoading(true);
       const { data, error } = await supabase
         .from('students')
         .select('*')
@@ -60,7 +72,7 @@ export function StudentsProvider({ children }) {
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [refreshToken]);
+  }, [refreshToken, authLoading, currentUser]);
 
   const value = useMemo(() => ({
     students,

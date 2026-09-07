@@ -17,6 +17,7 @@ import {
   UserRoundX,
 } from 'lucide-react';
 import { useStudents } from '../context/StudentsContext';
+import { useAuth } from '../context/AuthContext';
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const monthKey = () => new Date().toISOString().slice(0, 7);
@@ -73,12 +74,26 @@ function Section({ title, icon: Icon, children, action }) {
 
 export default function Dashboard() {
   const { students } = useStudents();
+  const { currentUser, loading: authLoading } = useAuth();
   const [remote, setRemote] = useState({ teachers: 0, attendance: [], payments: [] });
+  const [remoteLoading, setRemoteLoading] = useState(true);
+  const [remoteError, setRemoteError] = useState(null);
   const activities = [];
 
   useEffect(() => {
+    // Wait until the authenticated Supabase session is fully restored before
+    // querying, otherwise the queries run without privileges and collapse to 0.
+    if (authLoading) return;
+    if (!currentUser) {
+      setRemote({ teachers: 0, attendance: [], payments: [] });
+      setRemoteLoading(false);
+      return;
+    }
+
     let mounted = true;
     const load = async () => {
+      setRemoteLoading(true);
+      setRemoteError(null);
       try {
         const today = todayKey();
         const [{ data: teachers, error: teachersError }, { data: attendance, error: attendanceError }, { data: payments, error: paymentsError }] = await Promise.all([
@@ -97,12 +112,20 @@ export default function Dashboard() {
           });
         }
       } catch (error) {
-        logger.error('Dashboard', error);
+        // Do NOT silently translate a Supabase failure into an empty/`0` dashboard.
+        logger.error('Dashboard.load', error);
+        if (mounted) {
+          setRemoteError(error?.message || 'تعذر تحميل بيانات لوحة التحكم.');
+        }
+      } finally {
+        if (mounted) setRemoteLoading(false);
       }
     };
     load();
 
-    const refreshData = () => load();
+    const refreshData = () => {
+      if (mounted) load();
+    };
     window.addEventListener('isshaam:students-updated', refreshData);
     window.addEventListener('isshaam:payments-updated', refreshData);
     window.addEventListener('isshaam:attendance-updated', refreshData);
@@ -120,14 +143,14 @@ export default function Dashboard() {
       window.removeEventListener('isshaam:attendance-updated', refreshData);
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [authLoading, currentUser]);
 
   const metrics = useMemo(() => {
     const activeStudents = students.filter((student) => !student.archived);
     const attendance = remote.attendance;
     const payments = remote.payments;
     const currentPayments = payments.filter((payment) => {
-      const date = payment.date || payment.created_at || payment.createdAt || '';
+      const date = payment.date || payment.paid_at || payment.created_at || payment.paidAt || payment.createdAt || '';
       return String(date).slice(0, 7) === monthKey();
     });
     const present = attendance.filter((item) => isPresent(item.status)).length;
@@ -174,6 +197,20 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {remoteLoading && (
+        <div dir="rtl" className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">
+          <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+          جاري تحميل بيانات لوحة التحكم...
+        </div>
+      )}
+
+      {remoteError && (
+        <div dir="rtl" className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+          <CircleAlert size={18} className="mt-0.5 shrink-0" />
+          <span>تعذر تحميل جزء من بيانات لوحة التحكم: {remoteError} — تحقق من الاتصال بـ Supabase ثم أعد المحاولة.</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="التلاميذ النشطون" value={metrics.activeStudents.length} helper="الملفات المسجلة حالياً" icon={Users} tone="blue" />

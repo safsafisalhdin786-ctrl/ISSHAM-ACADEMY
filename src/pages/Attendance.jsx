@@ -413,6 +413,9 @@ export default function Attendance() {
 
                 notes:
                   record.notes,
+
+                user_id:
+                  currentUser?.uid || null,
               })
               .eq(
                 'id',

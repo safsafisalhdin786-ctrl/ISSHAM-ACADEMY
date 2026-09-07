@@ -52,6 +52,21 @@ const normalizeSupabaseUser = (user) => {
   };
 };
 
+/**
+ * Safely performs a Firestore document lookup.
+ * If the Firestore query fails (timeout, network, permissions, etc.),
+ * it logs a warning and returns null so that role resolution can
+ * fall through to the next strategy (including the env-var fallback).
+ */
+const safeFirestoreLookup = async (ref) => {
+  try {
+    return await withTimeout(getDoc(ref));
+  } catch (error) {
+    logger.warn('AuthContext', `Firestore lookup failed for ${ref.path}: ${error.message || error}`);
+    return null;
+  }
+};
+
 const resolveUserRoleFromFirestore = async (supabaseUser, expectedRole = null) => {
   if (!supabaseUser) {
     return { role: null, data: null };
@@ -63,10 +78,13 @@ const resolveUserRoleFromFirestore = async (supabaseUser, expectedRole = null) =
   let role = null;
   let data = null;
 
+  // Each Firestore lookup is individually guarded so that a single
+  // failure (timeout, offline, permissions) does NOT prevent the
+  // configured-admin-email fallback from being evaluated.
   if (email) {
     const adminEmailRef = doc(db, 'admins', email);
-    const adminEmailSnapshot = await withTimeout(getDoc(adminEmailRef));
-    if (adminEmailSnapshot.exists()) {
+    const adminEmailSnapshot = await safeFirestoreLookup(adminEmailRef);
+    if (adminEmailSnapshot?.exists()) {
       role = ALLOWED_ROLES.ADMIN;
       data = adminEmailSnapshot.data();
     }
@@ -74,8 +92,8 @@ const resolveUserRoleFromFirestore = async (supabaseUser, expectedRole = null) =
 
   if (!role) {
     const adminUidRef = doc(db, 'admins', supabaseUser.uid);
-    const adminUidSnapshot = await withTimeout(getDoc(adminUidRef));
-    if (adminUidSnapshot.exists()) {
+    const adminUidSnapshot = await safeFirestoreLookup(adminUidRef);
+    if (adminUidSnapshot?.exists()) {
       role = ALLOWED_ROLES.ADMIN;
       data = adminUidSnapshot.data();
     }
@@ -83,8 +101,8 @@ const resolveUserRoleFromFirestore = async (supabaseUser, expectedRole = null) =
 
   if (!role) {
     const teacherRef = doc(db, 'teachers', supabaseUser.uid);
-    const teacherSnapshot = await withTimeout(getDoc(teacherRef));
-    if (teacherSnapshot.exists()) {
+    const teacherSnapshot = await safeFirestoreLookup(teacherRef);
+    if (teacherSnapshot?.exists()) {
       role = ALLOWED_ROLES.TEACHER;
       data = teacherSnapshot.data();
     }
@@ -92,13 +110,14 @@ const resolveUserRoleFromFirestore = async (supabaseUser, expectedRole = null) =
 
   if (!role) {
     const studentRef = doc(db, 'students', supabaseUser.uid);
-    const studentSnapshot = await withTimeout(getDoc(studentRef));
-    if (studentSnapshot.exists()) {
+    const studentSnapshot = await safeFirestoreLookup(studentRef);
+    if (studentSnapshot?.exists()) {
       role = ALLOWED_ROLES.STUDENT;
       data = studentSnapshot.data();
     }
   }
 
+  // Fallback: check VITE_ADMIN_EMAIL / VITE_ADMIN_EMAILS env vars
   if (!role && configuredAdminEmails.length > 0 && email && configuredAdminEmails.includes(email)) {
     role = ALLOWED_ROLES.ADMIN;
     data = {
