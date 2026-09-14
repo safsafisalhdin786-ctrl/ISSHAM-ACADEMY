@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, describeSupabaseError } from '../supabase';
-import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock, Search, CreditCard, Printer, MessageCircle, X } from 'lucide-react';
 import { useStudents } from '../context/StudentsContext';
 import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
@@ -13,6 +13,10 @@ export default function Financials() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('شتنبر');
   const [statusFilter, setStatusFilter] = useState('all');
+  // معرف التلميذ الجاري تأكيد أداءه حالياً (لمنع الضغط المزدوج/التكرار)
+  const [confirmingId, setConfirmingId] = useState(null);
+  // بيانات آخر أداء تم تأكيده، لعرض بطاقة التأكيد وإرسالها عبر الواتساب
+  const [confirmedPayment, setConfirmedPayment] = useState(null);
 
   const months = ['شتنبر', 'أكتوبر', 'نونبر', 'دجنبر', 'يناير', 'فبراير', 'مارس', 'أبريل', 'ماي', 'يونيو'];
 
@@ -23,16 +27,23 @@ export default function Financials() {
     return String(dateVal);
   };
 
+  const normalizeMonth = (value) => String(value || '')
+    .trim()
+    .toLocaleLowerCase('ar-MA')
+    .replace(/\s+\d{4}$/, '');
+
+  const mapPayment = (payment) => ({
+    ...payment,
+    studentId: payment.student_id || payment.studentId,
+    studentName: payment.student_name || payment.studentName,
+    paidAt: payment.paid_at || payment.paidAt || payment.date,
+  });
+
   const fetchData = async () => {
     try {
       const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      setPayments((data || []).map((payment) => ({
-        ...payment,
-        studentId: payment.student_id || payment.studentId,
-        studentName: payment.student_name || payment.studentName,
-        paidAt: payment.paid_at || payment.paidAt,
-      })));
+      setPayments((data || []).map(mapPayment));
     } catch (err) {
       logger.error('Financials.fetchData', new Error(describeSupabaseError(err)));
       setPayments([]);
@@ -54,13 +65,33 @@ export default function Financials() {
   }, []);
 
   const getPaymentInfo = (studentId) => {
-    return payments.find(p => String(p.studentId) === String(studentId) && p.month === selectedMonth && (p.status === 'مؤدى' || p.status === 'paid'));
+    return payments.find((payment) => (
+      String(payment.studentId) === String(studentId)
+      && normalizeMonth(payment.month) === normalizeMonth(selectedMonth)
+      && ['مؤدى', 'paid', 'confirmed'].includes(String(payment.status || '').toLocaleLowerCase('ar-MA'))
+    ));
   };
 
   const handleMarkAsPaid = async (student) => {
+    // منع الضغط المزدوج/المتكرر أثناء تنفيذ طلب سابق لنفس التلميذ
+    if (confirmingId) return;
+    if (!student?.id) {
+      alert('تعذر تأكيد الأداء: معرّف التلميذ غير موجود.');
+      return;
+    }
+    const existingPayment = payments.find((payment) => (
+      String(payment.studentId) === String(student.id)
+      && normalizeMonth(payment.month) === normalizeMonth(selectedMonth)
+    ));
+    if (existingPayment && ['مؤدى', 'paid', 'confirmed'].includes(String(existingPayment.status || '').toLocaleLowerCase('ar-MA'))) {
+      setConfirmedPayment({ student, payment: existingPayment });
+      return;
+    }
+
+    setConfirmingId(student.id);
     try {
-      const newPayment = {
-        student_id: student.id || '',
+      const paymentValues = {
+        student_id: student.id,
         student_name: student.fullName || student.full_name || '',
         amount: student.monthlyFee || 0,
         month: selectedMonth,
@@ -68,12 +99,118 @@ export default function Financials() {
         paid_at: new Date().toISOString(),
         user_id: currentUser?.uid || null,
       };
-      const { error } = await supabase.from('payments').insert(newPayment);
+
+      const query = existingPayment
+        ? supabase.from('payments').update(paymentValues).eq('id', existingPayment.id)
+        : supabase.from('payments').insert(paymentValues);
+      const { data, error } = await query.select().single();
       if (error) throw error;
+
+      const savedPayment = mapPayment(data);
+      setPayments((current) => existingPayment
+        ? current.map((payment) => payment.id === savedPayment.id ? savedPayment : payment)
+        : [savedPayment, ...current]);
+      setConfirmedPayment({ student, payment: savedPayment });
       await fetchData();
     } catch (err) {
       logger.error('Financials.handleMarkAsPaid', err);
+      alert(`تعذر تسجيل الأداء: ${describeSupabaseError(err)}`);
+    } finally {
+      setConfirmingId(null);
     }
+  };
+
+  // تطبيع رقم هاتف الولي إلى الصيغة الدولية المطلوبة لواتساب
+  const formatPhoneForWhatsApp = (phone) => {
+    const raw = String(phone || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('+')) return raw.slice(1).replace(/\s+/g, '');
+    if (raw.startsWith('0')) return `212${raw.slice(1)}`.replace(/\s+/g, '');
+    return raw.replace(/\s+/g, '').replace(/-/g, '');
+  };
+
+  // إرسال إشعار تأكيد الأداء الشهري لولي الأمر عبر الواتساب
+  const sendConfirmationWhatsApp = (student, payment) => {
+    const phone = student.parent_whatsapp || student.parentPhone || student.parent_phone;
+    if (!phone) {
+      alert('تنبيه: رقم هاتف ولي الأمر غير متوفر لهذا التلميذ. تم حفظ تأكيد الأداء بنجاح، لكن يتعذر إرسال الإشعار عبر الواتساب.');
+      return;
+    }
+    const formattedPhone = formatPhoneForWhatsApp(phone);
+    const studentName = student.fullName || student.full_name || 'التلميذ(ة)';
+    const amount = payment?.amount || student.monthlyFee || 0;
+    const paidDate = formatDate(payment?.paidAt);
+
+    const message = `السلام عليكم ورحمة الله وبركاته،
+
+ولي أمر التلميذ(ة) ${studentName} المحترم،
+
+نخبركم أن الواجب الشهري الخاص بـ ${studentName} عن شهر ${selectedMonth} قد تم تسجيل أدائه بنجاح.
+💰 المبلغ المؤدى: ${amount} درهم
+🗓️ تاريخ الأداء: ${paidDate}
+
+نشكر لكم ثقتكم ودعمكم المستمر، ونتمنى لأبنائكم دوام التوفيق والنجاح.
+
+مع خالص الاحترام والتقدير،
+ISSHAAM ACADEMY
+مع إسهام... نتعلم اليوم لننجح غداً`;
+
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  // فتح نافذة طباعة/تصدير بطاقة تأكيد الأداء الشهري (قابلة للحفظ كصورة PDF عبر الطباعة)
+  const handlePrintConfirmationCard = (student, payment) => {
+    const printWindow = window.open('', '_blank', 'width=480,height=680');
+    if (!printWindow) return;
+
+    const studentName = escapeHtml(student.fullName || student.full_name || 'غير محدد');
+    const amount = escapeHtml(payment?.amount || student.monthlyFee || 0);
+    const paidDate = escapeHtml(formatDate(payment?.paidAt));
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>إشعار تأكيد الأداء - ${studentName}</title>
+        <style>
+          body { font-family: sans-serif; padding: 0; margin:0; direction: rtl; text-align: right; background:#f1f5f9; }
+          .card { max-width: 420px; margin: 20px auto; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,.1); background:#fff; }
+          .header { background: linear-gradient(135deg, #059669, #10b981); color:#fff; padding: 24px 20px; text-align:center; }
+          .header img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #fff; margin-bottom: 8px; }
+          .header h1 { margin: 0; font-size: 16px; font-weight: 800; }
+          .header p { margin: 6px 0 0; font-size: 13px; opacity:.9; }
+          .body { padding: 20px; }
+          .row { display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+          .row span:first-child { color:#64748b; font-weight:600; }
+          .row span:last-child { color:#0f172a; font-weight:800; }
+          .thanks { margin-top: 16px; font-size: 12.5px; color:#334155; line-height:1.8; text-align:center; }
+          .footer { background:#0f172a; color:#fff; text-align:center; padding: 14px; font-size: 11px; }
+          .footer strong { color:#34d399; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <img src="/logo.jpeg" alt="ISSHAAM ACADEMY" />
+            <h1>تم تأكيد الأداء الشهري بنجاح ✓</h1>
+            <p>ISSHAAM ACADEMY</p>
+          </div>
+          <div class="body">
+            <div class="row"><span>اسم التلميذ(ة):</span><span>${studentName}</span></div>
+            <div class="row"><span>الشهر:</span><span>${escapeHtml(selectedMonth)}</span></div>
+            <div class="row"><span>المبلغ المؤدى:</span><span>${amount} DH</span></div>
+            <div class="row"><span>تاريخ الأداء:</span><span>${paidDate}</span></div>
+            <p class="thanks">نشكر لكم ثقتكم ودعمكم المستمر، ونتمنى لأبنائكم دوام التوفيق والنجاح.</p>
+          </div>
+          <div class="footer"><strong>ISSHAAM ACADEMY</strong><br/>مع إسهام... نتعلم اليوم لننجح غداً</div>
+        </div>
+        <script>window.onload = function() { window.print(); };</script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const escapeHtml = (value) =>
@@ -239,18 +376,27 @@ export default function Financials() {
                       </td>
                       <td className="p-4 text-center">
                         {paid ? (
-                          <button
-                            onClick={() => handlePrintReceipt(s, payment)}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1"
-                          >
-                            <Printer className="w-3.5 h-3.5" /> طباعة الوصل
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handlePrintReceipt(s, payment)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> طباعة الوصل
+                            </button>
+                            <button
+                              onClick={() => sendConfirmationWhatsApp(s, payment)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" /> إشعار واتساب
+                            </button>
+                          </div>
                         ) : (
                           <button
                             onClick={() => handleMarkAsPaid(s)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1"
+                            disabled={confirmingId === s.id}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-3.5 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1"
                           >
-                            <CreditCard className="w-4 h-4" /> تأكيد الأداء
+                            <CreditCard className="w-4 h-4" /> {confirmingId === s.id ? 'جاري التأكيد...' : 'تأكيد الأداء'}
                           </button>
                         )}
                       </td>
@@ -262,6 +408,70 @@ export default function Financials() {
           </div>
         )}
       </div>
+
+      {confirmedPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setConfirmedPayment(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-500 text-white text-center py-6 px-5 relative">
+              <button
+                onClick={() => setConfirmedPayment(null)}
+                className="absolute top-3 left-3 text-white/80 hover:text-white"
+                aria-label="إغلاق"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src="/logo.jpeg"
+                alt="ISSHAAM ACADEMY"
+                className="w-16 h-16 rounded-full object-cover border-4 border-white mx-auto mb-2 shadow-md"
+              />
+              <h3 className="font-black text-base">تم تأكيد الأداء الشهري بنجاح ✓</h3>
+              <p className="text-xs opacity-90 mt-1">ISSHAAM ACADEMY</p>
+            </div>
+            <div className="p-5 space-y-2 text-sm">
+              <div className="flex justify-between border-b border-dashed border-slate-200 pb-2">
+                <span className="text-slate-500 font-semibold">اسم التلميذ(ة):</span>
+                <span className="font-black text-slate-900">{confirmedPayment.student.fullName}</span>
+              </div>
+              <div className="flex justify-between border-b border-dashed border-slate-200 pb-2">
+                <span className="text-slate-500 font-semibold">الشهر:</span>
+                <span className="font-black text-slate-900">{selectedMonth}</span>
+              </div>
+              <div className="flex justify-between border-b border-dashed border-slate-200 pb-2">
+                <span className="text-slate-500 font-semibold">المبلغ المؤدى:</span>
+                <span className="font-black text-emerald-600">{confirmedPayment.payment?.amount || confirmedPayment.student.monthlyFee || 0} DH</span>
+              </div>
+              <div className="flex justify-between pb-2">
+                <span className="text-slate-500 font-semibold">تاريخ الأداء:</span>
+                <span className="font-black text-slate-900">{formatDate(confirmedPayment.payment?.paidAt)}</span>
+              </div>
+              <p className="text-center text-xs text-slate-500 pt-2">
+                نشكر لكم ثقتكم ودعمكم المستمر، ونتمنى لأبنائكم دوام التوفيق والنجاح.
+              </p>
+            </div>
+            <div className="p-4 pt-0 flex gap-2">
+              <button
+                onClick={() => sendConfirmationWhatsApp(confirmedPayment.student, confirmedPayment.payment)}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1"
+              >
+                <MessageCircle className="w-4 h-4" /> إرسال إشعار عبر واتساب
+              </button>
+              <button
+                onClick={() => handlePrintConfirmationCard(confirmedPayment.student, confirmedPayment.payment)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1"
+              >
+                <Printer className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="bg-slate-900 text-center py-2 text-[11px] text-emerald-400 font-bold">
+              ISSHAAM ACADEMY · مع إسهام... نتعلم اليوم لننجح غداً
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
