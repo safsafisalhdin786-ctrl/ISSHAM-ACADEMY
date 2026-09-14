@@ -20,6 +20,31 @@ export default function Financials() {
 
   const months = ['شتنبر', 'أكتوبر', 'نونبر', 'دجنبر', 'يناير', 'فبراير', 'مارس', 'أبريل', 'ماي', 'يونيو'];
 
+  // عمود "month" في جدول payments الحقيقي في Supabase من نوع integer (رقم الشهر
+  // التقويمي 1-12)، وليس نصاً. تم التأكد من ذلك مباشرة عبر خطأ Postgres:
+  // "invalid input syntax for type integer" عند إرسال اسم الشهر بالعربية.
+  // هذا التطابق يربط كل اسم شهر بالسنة الدراسية برقم الشهر التقويمي الفعلي.
+  const monthNameToNumber = {
+    'شتنبر': 9, 'أكتوبر': 10, 'نونبر': 11, 'دجنبر': 12,
+    'يناير': 1, 'فبراير': 2, 'مارس': 3, 'أبريل': 4, 'ماي': 5, 'يونيو': 6,
+  };
+  const monthNumberToName = Object.fromEntries(
+    Object.entries(monthNameToNumber).map(([name, num]) => [num, name])
+  );
+
+  // "year" و"payment_month" (date) عمودان حقيقيان في الجدول تم اكتشافهما مباشرة عبر
+  // أخطاء Postgres 23502 (NOT NULL). "payment_month" من نوع date (يقبل فقط تاريخاً
+  // كاملاً مثل "2026-09-01")، لذا نحسب أول يوم من الشهر التقويمي المختار ضمن السنة
+  // الدراسية الصحيحة: أشهر شتنبر-دجنبر تنتمي لسنة بداية الموسم الدراسي، وأشهر
+  // يناير-يونيو تنتمي للسنة الموالية.
+  const getAcademicYearForMonth = (monthNumber) => {
+    const now = new Date();
+    const currentCalendarMonth = now.getMonth() + 1;
+    const currentCalendarYear = now.getFullYear();
+    const academicStartYear = currentCalendarMonth >= 9 ? currentCalendarYear : currentCalendarYear - 1;
+    return monthNumber >= 9 ? academicStartYear : academicStartYear + 1;
+  };
+
   const formatDate = (dateVal) => {
     if (!dateVal) return new Date().toLocaleDateString('ar-MA');
     if (typeof dateVal === 'string') return dateVal;
@@ -27,16 +52,18 @@ export default function Financials() {
     return String(dateVal);
   };
 
-  const normalizeMonth = (value) => String(value || '')
-    .trim()
-    .toLocaleLowerCase('ar-MA')
-    .replace(/\s+\d{4}$/, '');
-
+  // تم التحقق مباشرة من مخطط جدول payments الحقيقي في Supabase عبر PostgREST
+  // (رسائل خطأ Postgres 42703 القاطعة). الأعمدة الموجودة فعلياً المتعلقة بالتاريخ
+  // والاسم هي "payment_date" و"receipt_number"؛ أما "paid_at" و"date" و
+  // "student_name" و"receipt_no" فغير موجودة إطلاقاً في الجدول الحقيقي، ولهذا
+  // كانت كل عملية كتابة تتضمنها ترفضها قاعدة البيانات فوراً.
   const mapPayment = (payment) => ({
     ...payment,
     studentId: payment.student_id || payment.studentId,
     studentName: payment.student_name || payment.studentName,
-    paidAt: payment.paid_at || payment.paidAt || payment.date,
+    // نحوّل رقم الشهر المخزَّن في قاعدة البيانات إلى اسمه العربي للعرض والمقارنة.
+    monthName: monthNumberToName[Number(payment.month)] || payment.month,
+    paidAt: payment.payment_date || payment.paid_at || payment.date || payment.paidAt,
   });
 
   const fetchData = async () => {
@@ -67,7 +94,7 @@ export default function Financials() {
   const getPaymentInfo = (studentId) => {
     return payments.find((payment) => (
       String(payment.studentId) === String(studentId)
-      && normalizeMonth(payment.month) === normalizeMonth(selectedMonth)
+      && Number(payment.month) === monthNameToNumber[selectedMonth]
       && ['مؤدى', 'paid', 'confirmed'].includes(String(payment.status || '').toLocaleLowerCase('ar-MA'))
     ));
   };
@@ -81,7 +108,7 @@ export default function Financials() {
     }
     const existingPayment = payments.find((payment) => (
       String(payment.studentId) === String(student.id)
-      && normalizeMonth(payment.month) === normalizeMonth(selectedMonth)
+      && Number(payment.month) === monthNameToNumber[selectedMonth]
     ));
     if (existingPayment && ['مؤدى', 'paid', 'confirmed'].includes(String(existingPayment.status || '').toLocaleLowerCase('ar-MA'))) {
       setConfirmedPayment({ student, payment: existingPayment });
@@ -90,13 +117,33 @@ export default function Financials() {
 
     setConfirmingId(student.id);
     try {
+      const monthlyFee = student.monthlyFee || 0;
+      const monthNumber = monthNameToNumber[selectedMonth];
+      const academicYear = getAcademicYearForMonth(monthNumber);
       const paymentValues = {
         student_id: student.id,
-        student_name: student.fullName || student.full_name || '',
-        amount: student.monthlyFee || 0,
-        month: selectedMonth,
+        // "student_name" غير موجود في جدول payments الحقيقي (تم التحقق مباشرة)؛
+        // اسم التلميذ يُعرض دائماً من جدول students عبر student_id، لذا لا حاجة لتخزينه هنا.
+        amount: monthlyFee,
+        // "amount_due" و"amount_paid" عمودان NOT NULL تم اكتشافهما مباشرة عبر خطأ
+        // Postgres 23502 (كان يُرفض كل تأكيد أداء لأن هذين العمودين لم يكونا يُرسَلان إطلاقاً).
+        amount_due: monthlyFee,
+        // نعتبر تأكيد الأداء أداءً كاملاً للمبلغ المستحق.
+        amount_paid: monthlyFee,
+        // عمود "month" integer في قاعدة البيانات الحقيقية؛ نرسل رقم الشهر التقويمي
+        // المقابل لاسم الشهر المختار بدل النص العربي (وإلا يرفضه Postgres بخطأ 22P02).
+        month: monthNumber,
+        // "year" عمود integer حقيقي في الجدول (تم التحقق مباشرة)، يمثل السنة
+        // المرتبطة بالشهر المختار ضمن الموسم الدراسي.
+        year: academicYear,
         status: 'paid',
-        paid_at: new Date().toISOString(),
+        // "payment_month" عمود NOT NULL من نوع date (تم اكتشافه مباشرة عبر خطأ
+        // Postgres 23502 ثم تأكيد نوعه date عبر خطأ 22007)؛ نرسل أول يوم من الشهر
+        // التقويمي المختار ضمن السنة الصحيحة.
+        payment_month: `${academicYear}-${String(monthNumber).padStart(2, '0')}-01`,
+        // العمود الحقيقي الموجود في مخطط Supabase هو "payment_date"؛
+        // "paid_at" و"date" غير موجودين في الجدول ويتسببان في رفض الطلب (42703).
+        payment_date: new Date().toISOString(),
         user_id: currentUser?.uid || null,
       };
 
