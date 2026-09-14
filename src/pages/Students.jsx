@@ -26,6 +26,15 @@ const LEVEL_OPTIONS = MOROCCAN_LEVELS.map((name_ar) => ({
   name_ar,
 }));
 
+// The `levels` table can be empty/unavailable, in which case the UI falls back to
+// MOROCCAN_LEVELS where each option's "id" is the Arabic level name, not a real UUID.
+// `students.level_id` is a uuid column, so only a genuine UUID may ever be written there;
+// anything else (the Arabic label) must go into the free-text `academic_level` column instead.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Matches the "SP-<base36 code>" format already used by existing real student records.
+const generateStudentCode = () => `SP-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
 const normalizeTeacher = (teacher) => {
   try {
     const details = typeof teacher.subject === 'string' ? JSON.parse(teacher.subject) : teacher.subject;
@@ -256,14 +265,11 @@ export default function Students() {
     setSaving(true);
     setErrorMessage('');
 
+    const isRealLevelId = UUID_PATTERN.test(String(formData.level_id || ''));
     const payload = {
       full_name: fullName,
-      level_id: levels.some((level) => String(level.id) === String(formData.level_id))
-        ? formData.level_id
-        : null,
-      academic_level: levels.some((level) => String(level.id) === String(formData.level_id))
-        ? null
-        : formData.level_id || null,
+      level_id: isRealLevelId ? formData.level_id : null,
+      academic_level: isRealLevelId ? null : (formData.level_id || null),
       teacher_id: formData.teacher_id || null,
       parent_phone: formData.parent_phone.trim(),
       monthly_fee: monthlyFee,
@@ -275,8 +281,11 @@ export default function Students() {
       const studentFields = {
         full_name: payload.full_name,
         level_id: payload.level_id,
+        academic_level: payload.academic_level,
         teacher_id: payload.teacher_id,
-        ...(editingStudentId ? {} : { notes: `المدرسة: ${formData.original_school.trim()}` }),
+        // students.student_code is NOT NULL; existing records already carry an
+        // "SP-<code>" value, so new rows must generate one too or the insert fails.
+        ...(editingStudentId ? {} : { student_code: generateStudentCode(), notes: `المدرسة: ${formData.original_school.trim()}` }),
         parent_phone: payload.parent_phone,
         monthly_fee: payload.monthly_fee,
         status: payload.status,
